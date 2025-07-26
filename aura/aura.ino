@@ -29,10 +29,27 @@ String location = String(LOCATION_DEFAULT);
 unsigned long last_weather_update = 0;
 unsigned long last_clock_update = 0;
 unsigned long last_lvgl_update = 0;
+unsigned long last_memory_report = 0;
+
+// Memory monitoring function
+void printMemoryStatus() {
+    size_t free_heap = esp_get_free_heap_size();
+    size_t min_free_heap = esp_get_minimum_free_heap_size();
+    
+    Serial.printf("=== Memory Status ===\n");
+    Serial.printf("Free heap: %d bytes\n", free_heap);
+    Serial.printf("Minimum free heap: %d bytes\n", min_free_heap);
+    Serial.printf("Heap fragmentation: %d%%\n", 100 - (free_heap * 100) / heap_caps_get_total_size(MALLOC_CAP_DEFAULT));
+    Serial.printf("=====================\n");
+}
 
 void setup() {
     // Initialize serial communication
     Serial.begin(115200);
+    delay(1000); // Give serial time to initialize
+    
+    // Print initial memory status
+    printMemoryStatus();
     
     // Initialize logging system first
     logging_init();
@@ -44,85 +61,141 @@ void setup() {
 
     // Initialize display first
     LOG_MAIN_I("Initializing display...");
+    Serial.println("Initializing display...");
+    
     if (!display.init()) {
         LOG_MAIN_E("Display initialization failed!");
         Serial.println("ERROR: Display initialization failed!");
-        while (1); // Halt on critical error
+        while (1) delay(1000); // Halt on critical error with delay to prevent watchdog
     }
+    
     LOG_MAIN_I("Display initialized successfully");
     Serial.println("Display initialized successfully");
+    printMemoryStatus(); // Check memory after display init
+
+    // Small delay to let display settle
+    delay(100);
 
     // Initialize UI now that LVGL is confirmed working
     LOG_MAIN_I("Initializing UI...");
+    Serial.println("Initializing UI...");
+    
     if (!ui.init(&display)) {
         LOG_MAIN_E("UI initialization failed!");
         Serial.println("ERROR: UI initialization failed!");
-        while (1); // Halt on critical error
+        while (1) delay(1000); // Halt on critical error
     }
     
     // Set UI language from global setting
     ui.setLanguage(current_language);
     LOG_MAIN_I("UI initialized successfully");
     Serial.println("UI initialized successfully");
+    printMemoryStatus(); // Check memory after UI init
 
-    // Show WiFi configuration screen first
+    // Create a simple splash screen first instead of WiFi config screen
+    Serial.println("Creating simple splash screen...");
+    ui.createSimpleSplashScreen();
+    
+    // Force LVGL update with error checking
+    Serial.println("Updating display...");
+    try {
+        display.task(); // Process LVGL tasks
+        delay(10);
+        display.task(); // Process again to ensure completion
+    } catch (...) {
+        Serial.println("ERROR: LVGL update failed!");
+        while (1) delay(1000);
+    }
+    
+    Serial.println("Initial UI displayed successfully");
+    printMemoryStatus(); // Check memory after initial UI
+
+    // Initialize WiFi component with retry
+    Serial.println("Initializing WiFi component...");
+    int wifi_init_retries = 3;
+    while (wifi_init_retries > 0) {
+        if (wifi_component.init()) {
+            Serial.println("WiFi component initialized successfully");
+            break;
+        } else {
+            wifi_init_retries--;
+            Serial.printf("WiFi init failed, retries left: %d\n", wifi_init_retries);
+            if (wifi_init_retries == 0) {
+                Serial.println("ERROR: WiFi component initialization failed after retries!");
+                // Don't halt - continue without WiFi
+                break;
+            }
+            delay(1000);
+        }
+    }
+
+    // Initialize weather component with retry
+    Serial.println("Initializing weather component...");
+    int weather_init_retries = 3;
+    while (weather_init_retries > 0) {
+        if (weather.init()) {
+            Serial.println("Weather initialized successfully");
+            break;
+        } else {
+            weather_init_retries--;
+            Serial.printf("Weather init failed, retries left: %d\n", weather_init_retries);
+            if (weather_init_retries == 0) {
+                Serial.println("ERROR: Weather initialization failed after retries!");
+                // Don't halt - continue without weather
+                break;
+            }
+            delay(1000);
+        }
+    }
+
+    // Now show WiFi config screen
+    Serial.println("Showing WiFi configuration screen...");
     ui.createWiFiConfigScreen();
-    lv_refr_now(NULL); // Force immediate display update
+    display.task(); // Update display
+    delay(10);
+    display.task(); // Update again
     Serial.println("WiFi config screen displayed");
 
-    // Initialize WiFi component
-    if (!wifi_component.init()) {
-        Serial.println("ERROR: WiFi component initialization failed!");
-        while (1); // Halt on critical error
-    }
-    Serial.println("WiFi component initialized successfully");
+    // Try to connect to WiFi (non-blocking)
+    Serial.println("Attempting WiFi connection...");
+    if (wifi_component.connect()) {
+        Serial.println("WiFi connected successfully");
+        Serial.printf("IP address: %s\n", wifi_component.getLocalIP().c_str());
+        
+        // Configure time
+        configTime(0, 0, "pool.ntp.org");
+        Serial.println("Time configuration completed");
 
-    // Initialize weather component
-    if (!weather.init()) {
-        Serial.println("ERROR: Weather initialization failed!");
-        while (1); // Halt on critical error
-    }
-    Serial.println("Weather initialized successfully");
+        // Now create the main screen and populate with data
+        ui.createMainScreen();
+        display.task();
 
-    // Connect to WiFi
-    Serial.println("Connecting to WiFi...");
-    if (!wifi_component.connect()) {
-        Serial.println("Failed to connect to WiFi");
-        ESP.restart(); // Restart and try again
-    }
-    
-    Serial.println("WiFi connected successfully");
-    Serial.printf("IP address: %s\n", wifi_component.getLocalIP().c_str());
+        // Initialize weather data with default values
+        Serial.println("Setting up initial weather display...");
+        
+        // Set initial data to make the display look correct
+        ui.updateTemperature(22.0, 24.0); // 22°C, feels like 24°C
+        ui.updateLocation("London");
+        ui.updateClock(); // Update clock immediately
+        
+        // Force immediate redraw
+        display.task();
+        Serial.println("Main UI displayed with initial data");
 
-    // Configure time
-    configTime(0, 0, "pool.ntp.org");
-    Serial.println("Time configuration completed");
-
-    // Now create the main screen and populate with data
-    ui.createMainScreen();
-
-    // Initialize weather data with default values
-    Serial.println("Setting up initial weather display...");
-    
-    // Set initial data to make the display look correct
-    ui.updateTemperature(22.0, 24.0); // 22°C, feels like 24°C
-    ui.updateLocation("London");
-    ui.updateClock(); // Update clock immediately
-    
-    // Force immediate redraw
-    lv_refr_now(NULL);
-    Serial.println("Main UI displayed with initial data");
-
-    // Trigger first weather update
-    Serial.println("Triggering initial weather data fetch...");
-    if (weather.fetchWeatherData()) {
-        Serial.println("Initial weather data fetched successfully");
-        updateUIWithWeatherData();
+        // Trigger first weather update
+        Serial.println("Triggering initial weather data fetch...");
+        if (weather.fetchWeatherData()) {
+            Serial.println("Initial weather data fetched successfully");
+            updateUIWithWeatherData();
+        } else {
+            Serial.println("Initial weather fetch failed, using placeholder data");
+        }
     } else {
-        Serial.println("Initial weather fetch failed, using placeholder data");
+        Serial.println("WiFi connection failed - continuing with offline mode");
     }
 
-    Serial.println("Aura Weather Display Ready!");
+    printMemoryStatus(); // Final memory check
+    Serial.println("Aura Weather Display Setup Complete!");
 }
 
 void loop() {
@@ -135,14 +208,25 @@ void loop() {
         
         if (command.startsWith("log_")) {
             logging_handle_serial_command(command.c_str());
+        } else if (command == "mem") {
+            printMemoryStatus();
+        } else if (command == "restart") {
+            Serial.println("Restarting...");
+            ESP.restart();
         }
         // Add other command handling here in the future
     }
 
-    // Handle LVGL timer (high frequency)
+    // Handle LVGL timer (high frequency) with error protection
     if (current_time - last_lvgl_update >= 5) {
-        display.task(); // This calls lv_timer_handler()
-        last_lvgl_update = current_time;
+        try {
+            display.task(); // This calls lv_timer_handler()
+            last_lvgl_update = current_time;
+        } catch (...) {
+            Serial.println("LVGL task error - restarting in 5 seconds");
+            delay(5000);
+            ESP.restart();
+        }
     }
 
     // Update clock every second
@@ -151,8 +235,9 @@ void loop() {
         last_clock_update = current_time;
     }
 
-    // Update weather every 5 minutes
-    if (current_time - last_weather_update >= 300000 || last_weather_update == 0) {
+    // Update weather every 5 minutes (only if connected)
+    if (wifi_component.isConnected() && 
+        (current_time - last_weather_update >= 300000 || last_weather_update == 0)) {
         Serial.println("Updating weather data...");
         if (weather.fetchWeatherData()) {
             Serial.println("Weather data updated successfully");
@@ -161,6 +246,13 @@ void loop() {
             Serial.println("Failed to fetch weather data - keeping current display");
         }
         last_weather_update = current_time;
+    }
+
+    // Print memory status every 30 seconds in debug builds
+    if (current_time - last_memory_report >= 30000) {
+        size_t free_heap = esp_get_free_heap_size();
+        Serial.printf("Free heap: %d bytes\n", free_heap);
+        last_memory_report = current_time;
     }
 
     // LVGL tick increment for timing

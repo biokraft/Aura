@@ -357,6 +357,45 @@ void UI::createWiFiConfigScreen() {
     LOG_UI_I("WiFi configuration screen displayed");
 }
 
+void UI::createSimpleSplashScreen() {
+    // Clean up any existing screen
+    cleanupMainScreen();
+    
+    // Create simple splash screen with minimal memory usage
+    lv_obj_t* splash_screen = lv_obj_create(NULL);
+    if (!splash_screen) {
+        LOG_UI_E("Failed to create splash screen");
+        return;
+    }
+    
+    // Set simple background color
+    lv_obj_set_style_bg_color(splash_screen, lv_color_hex(0x2c5282), LV_PART_MAIN);
+    
+    // Create simple title
+    lv_obj_t* lbl_title = lv_label_create(splash_screen);
+    if (lbl_title) {
+        lv_obj_set_style_text_font(lbl_title, getFont20(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(lbl_title, lv_color_white(), LV_PART_MAIN);
+        lv_obj_set_style_text_align(lbl_title, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(lbl_title, "Aura");
+        lv_obj_align(lbl_title, LV_ALIGN_CENTER, 0, -20);
+    }
+    
+    // Create status label
+    lv_obj_t* lbl_status = lv_label_create(splash_screen);
+    if (lbl_status) {
+        lv_obj_set_style_text_font(lbl_status, getFont14(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(lbl_status, lv_color_white(), LV_PART_MAIN);
+        lv_obj_set_style_text_align(lbl_status, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(lbl_status, "Starting...");
+        lv_obj_align(lbl_status, LV_ALIGN_CENTER, 0, 20);
+    }
+    
+    // Load the splash screen
+    lv_screen_load(splash_screen);
+    LOG_UI_I("Simple splash screen displayed");
+}
+
 void UI::createDailyForecastBox() {
     // Create forecast title label - original v1.0.1 style
     lbl_forecast = lv_label_create(main_screen);
