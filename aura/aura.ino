@@ -1,127 +1,171 @@
-// Aura Weather Display - DEBUG VERSION
-// Simplified to identify crash location
+// Aura Weather Display - Main Application
+// Complete implementation with all components
 
 #include "src/config.h"
+#include "src/components/logging/logging.h"
+#include "src/components/display/display.h"
+#include "src/components/ui/ui.h"
+#include "src/components/wifi/wifi.h"
+#include "src/components/weather/weather.h"
 
-// Temporary debug prints using basic Serial
-#define DEBUG_PRINT(x) do { Serial.print("[DEBUG] "); Serial.println(x); Serial.flush(); delay(100); } while(0)
-#define DEBUG_PRINTF(fmt, ...) do { Serial.print("[DEBUG] "); Serial.printf(fmt, ##__VA_ARGS__); Serial.println(); Serial.flush(); delay(100); } while(0)
+#include <lvgl.h>
+#include <WiFi.h>
+#include <ArduinoJson.h>
+#include <Preferences.h>
+
+// Global component instances
+Display display;
+UI ui;
+WiFiComponent wifi_component;
+Weather weather;
+
+// Global variables (required by config.h extern declarations)
+Language current_language = LANG_EN;
+bool use_fahrenheit = false;
+bool use_24_hour = true;
+char latitude[16] = LATITUDE_DEFAULT;
+char longitude[16] = LONGITUDE_DEFAULT;
+String location = LOCATION_DEFAULT;
+
+// Timing variables
+unsigned long lastWeatherUpdate = 0;
+unsigned long lastClockUpdate = 0;
+unsigned long lastLVGLTick = 0;
 
 void setup() {
-    // Initialize serial with longer delay
     Serial.begin(115200);
-    delay(2000); // Give serial more time to stabilize
+    delay(2000); // Allow serial to stabilize
     
-    DEBUG_PRINT("=== AURA DEBUG MODE ===");
-    DEBUG_PRINT("Serial initialized successfully");
+    // Initialize logging system first
+    LOG_MAIN_I("=== AURA WEATHER DISPLAY STARTING ===");
+    logging_init();
+    LOG_MAIN_I("Logging system initialized");
+    LOG_MEMORY_INFO(TAG_MAIN);
     
-    // Test basic memory
-    DEBUG_PRINTF("Free heap at start: %u bytes", ESP.getFreeHeap());
-    DEBUG_PRINTF("PSRAM available: %s", psramFound() ? "YES" : "NO");
-    if (psramFound()) {
-        DEBUG_PRINTF("PSRAM size: %u bytes", ESP.getPsramSize());
-        DEBUG_PRINTF("Free PSRAM: %u bytes", ESP.getFreePsram());
+    // Initialize display system
+    LOG_MAIN_I("Initializing display...");
+    if (!display.init()) {
+        LOG_MAIN_E("Display initialization failed");
+        while(1) delay(1000); // Halt on critical failure
+    }
+    LOG_MAIN_I("Display initialized successfully");
+    LOG_MEMORY_INFO(TAG_MAIN);
+    
+    // Initialize UI system
+    LOG_MAIN_I("Initializing UI...");
+    if (!ui.init(&display)) {
+        LOG_MAIN_E("UI initialization failed");
+        while(1) delay(1000); // Halt on critical failure
+    }
+    LOG_MAIN_I("UI initialized successfully");
+    
+    // Create splash screen first
+    LOG_MAIN_I("Creating splash screen...");
+    ui.createSimpleSplashScreen();
+    lv_timer_handler(); // Process LVGL tasks
+    delay(2000); // Show splash screen
+    
+    // Initialize WiFi component
+    LOG_MAIN_I("Initializing WiFi...");
+    if (!wifi_component.init()) {
+        LOG_MAIN_E("WiFi initialization failed");
+    } else {
+        LOG_MAIN_I("WiFi initialized successfully");
+        
+        // Try to connect to WiFi
+        LOG_MAIN_I("Attempting WiFi connection...");
+        if (wifi_component.connect()) {
+            LOG_MAIN_I("WiFi connected successfully");
+            LOG_MAIN_I("IP address: %s", wifi_component.getLocalIP().c_str());
+            
+            // Enable SNTP now that WiFi is connected
+            logging_enable_sntp("pool.ntp.org");
+        } else {
+            LOG_MAIN_W("WiFi connection failed - continuing without network");
+        }
+    }
+    LOG_MEMORY_INFO(TAG_MAIN);
+    
+    // Initialize weather component
+    LOG_MAIN_I("Initializing weather...");
+    if (!weather.init()) {
+        LOG_MAIN_E("Weather initialization failed");
+    } else {
+        LOG_MAIN_I("Weather initialized successfully");
+        
+        // Fetch initial weather data if WiFi is connected
+        if (wifi_component.isConnected()) {
+            LOG_MAIN_I("Fetching initial weather data...");
+            weather.fetchWeatherData();
+        }
+    }
+    LOG_MEMORY_INFO(TAG_MAIN);
+    
+    // Create main application screen
+    LOG_MAIN_I("Creating main application screen...");
+    ui.createMainScreen();
+    
+    // Update UI with any available data
+    if (weather.isDataValid()) {
+        LOG_MAIN_I("Updating UI with weather data");
+        // Convert weather data to JSON for UI update
+        JsonDocument weatherDoc;
+        const WeatherData& data = weather.getCurrentWeather();
+        weatherDoc["current"]["temperature_2m"] = data.current_temp;
+        weatherDoc["current"]["apparent_temperature"] = data.feels_like;
+        weatherDoc["current"]["weather_code"] = data.weather_code;
+        weatherDoc["current"]["is_day"] = data.is_day;
+        ui.updateWeatherData(weatherDoc);
     }
     
-    DEBUG_PRINT("Basic system checks passed");
+    LOG_MAIN_I("=== AURA INITIALIZATION COMPLETE ===");
+    LOG_MEMORY_INFO(TAG_MAIN);
     
-    // Test simple delay loop to ensure system stability
-    for (int i = 0; i < 5; i++) {
-        DEBUG_PRINTF("Heartbeat %d - Free heap: %u", i+1, ESP.getFreeHeap());
-        delay(1000);
-    }
-    
-    DEBUG_PRINT("=== ATTEMPTING COMPONENT INITIALIZATION ===");
-    
-    // Try to initialize logging system
-    DEBUG_PRINT("Initializing logging system...");
-    try {
-        #include "src/components/logging/logging.h"
-        logging_init();
-        DEBUG_PRINT("Logging system initialized successfully");
-        LOG_MAIN_I("Logging system is working");
-    } catch (...) {
-        DEBUG_PRINT("ERROR: Logging system initialization failed");
-    }
-    
-    DEBUG_PRINT("=== BASIC INITIALIZATION COMPLETE ===");
-    DEBUG_PRINT("If you see this message, basic system is working");
-    DEBUG_PRINT("Monitor will continue with heartbeat messages...");
+    // Initialize timing
+    lastWeatherUpdate = millis();
+    lastClockUpdate = millis();
+    lastLVGLTick = millis();
 }
 
 void loop() {
-    static unsigned long last_heartbeat = 0;
-    unsigned long current_time = millis();
+    unsigned long currentTime = millis();
     
-    // Heartbeat every 5 seconds
-    if (current_time - last_heartbeat >= 5000) {
-        DEBUG_PRINTF("Heartbeat - Uptime: %lu ms, Free heap: %u bytes", 
-                     current_time, ESP.getFreeHeap());
-        last_heartbeat = current_time;
+    // Handle LVGL timer tasks (required for UI updates)
+    if (currentTime - lastLVGLTick >= 5) {
+        lv_tick_inc(currentTime - lastLVGLTick);
+        lastLVGLTick = currentTime;
+    }
+    lv_timer_handler();
+    
+    // Update clock every minute
+    if (currentTime - lastClockUpdate >= 60000) {
+        ui.updateClock();
+        lastClockUpdate = currentTime;
     }
     
-    // Handle serial commands for debugging
-    if (Serial.available()) {
-        String command = Serial.readStringUntil('\n');
-        command.trim();
+    // Update weather data every 10 minutes if connected
+    if (wifi_component.isConnected() && 
+        (currentTime - lastWeatherUpdate >= UPDATE_INTERVAL)) {
         
-        if (command == "mem") {
-            DEBUG_PRINTF("=== MEMORY STATUS ===");
-            DEBUG_PRINTF("Free heap: %u bytes", ESP.getFreeHeap());
-            DEBUG_PRINTF("Min free heap: %u bytes", ESP.getMinFreeHeap());
-            DEBUG_PRINTF("Heap size: %u bytes", ESP.getHeapSize());
-            if (psramFound()) {
-                DEBUG_PRINTF("PSRAM size: %u bytes", ESP.getPsramSize());
-                DEBUG_PRINTF("Free PSRAM: %u bytes", ESP.getFreePsram());
-            }
-            DEBUG_PRINTF("CPU freq: %u MHz", ESP.getCpuFreqMHz());
-            DEBUG_PRINTF("Flash size: %u bytes", ESP.getFlashChipSize());
-        } else if (command == "restart") {
-            DEBUG_PRINT("Restarting ESP32...");
-            delay(1000);
-            ESP.restart();
-        } else if (command == "info") {
-            DEBUG_PRINTF("Chip model: %s", ESP.getChipModel());
-            DEBUG_PRINTF("Chip revision: %d", ESP.getChipRevision());
-            DEBUG_PRINTF("Chip cores: %d", ESP.getChipCores());
-            DEBUG_PRINTF("SDK version: %s", ESP.getSdkVersion());
-        } else if (command == "test_display") {
-            DEBUG_PRINT("=== TESTING DISPLAY INITIALIZATION ===");
-            try {
-                DEBUG_PRINT("Including TFT_eSPI...");
-                #include <TFT_eSPI.h>
-                DEBUG_PRINT("Creating TFT instance...");
-                TFT_eSPI* tft = new TFT_eSPI();
-                DEBUG_PRINT("Initializing TFT...");
-                tft->init();
-                DEBUG_PRINT("TFT init successful");
-                delete tft;
-                DEBUG_PRINT("TFT test completed successfully");
-            } catch (...) {
-                DEBUG_PRINT("ERROR: TFT initialization failed");
-            }
-        } else if (command == "test_lvgl") {
-            DEBUG_PRINT("=== TESTING LVGL INITIALIZATION ===");
-            try {
-                DEBUG_PRINT("Including LVGL...");
-                #include <lvgl.h>
-                DEBUG_PRINT("Initializing LVGL...");
-                lv_init();
-                DEBUG_PRINT("LVGL init successful");
-                DEBUG_PRINT("LVGL test completed successfully");
-            } catch (...) {
-                DEBUG_PRINT("ERROR: LVGL initialization failed");
-            }
-        } else if (command == "help") {
-            DEBUG_PRINT("=== DEBUG COMMANDS ===");
-            DEBUG_PRINT("mem - Show memory status");
-            DEBUG_PRINT("restart - Restart ESP32");
-            DEBUG_PRINT("info - Show chip info");
-            DEBUG_PRINT("test_display - Test TFT_eSPI initialization");
-            DEBUG_PRINT("test_lvgl - Test LVGL initialization");
-            DEBUG_PRINT("help - Show this help");
+        LOG_MAIN_I("Updating weather data...");
+        if (weather.fetchWeatherData()) {
+            LOG_MAIN_I("Weather data updated successfully");
+            
+            // Update UI with new weather data
+            JsonDocument weatherDoc;
+            const WeatherData& data = weather.getCurrentWeather();
+            weatherDoc["current"]["temperature_2m"] = data.current_temp;
+            weatherDoc["current"]["apparent_temperature"] = data.feels_like;
+            weatherDoc["current"]["weather_code"] = data.weather_code;
+            weatherDoc["current"]["is_day"] = data.is_day;
+            ui.updateWeatherData(weatherDoc);
+            
+            lastWeatherUpdate = currentTime;
+        } else {
+            LOG_MAIN_W("Weather update failed");
         }
     }
     
-    delay(100); // Small delay to prevent watchdog issues
+    // Small delay to prevent watchdog issues
+    delay(10);
 }
