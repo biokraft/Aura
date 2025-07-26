@@ -110,7 +110,7 @@ The weather icons and images are derived from the [Google Weather Icons project 
 This project is based on the fantastic work of others in the open-source community.
 
 -   **Original Project:** The foundational code comes from [Surrey-Homeware/Aura](https://github.com/Surrey-Homeware/Aura).
--   **3D Model & Fork:** The 3D-printable case and inspiration for this fork are from [@biokraft's version](https://github.com/biokraft/Aura).
+-   **3D Model & Fork:** The 3D-printable case and inspiration for this fork are from [@Surrey-Homeware](https://github.com/Surrey-Homeware/Aura).
 -   **UI Framework:** [LVGL](https://lvgl.io/)
 -   **Libraries:** `ArduinoJson`, `HttpClient`, `TFT_eSPI`, `WifiManager`, `XPT2046_Touchscreen`
 -   **Inspiration & Resources:**
