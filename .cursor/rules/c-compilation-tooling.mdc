@@ -1,0 +1,104 @@
+---
+description: Modern C compilation and tooling: Apply when working with C compilation, build systems, or tooling setup
+globs: **/*.c, **/*.h, **/Makefile, **/CMakeLists.txt, **/*.cmake
+alwaysApply: false
+---
+
+# Modern C Compilation and Tooling Guidelines
+
+When working with C code compilation and tooling, follow these modern best practices:
+
+## C Standard Requirements
+
+- Always specify a C standard explicitly: `-std=c11` or `-std=c99`
+- Avoid GNU extensions unless absolutely necessary for portability
+- Prefer C11 over C99 when possible for better features
+
+```bash
+# Good
+gcc -std=c11 my_program.c
+
+# Avoid (relies on compiler defaults)
+gcc my_program.c
+```
+
+## Essential Compiler Warning Flags
+
+Always enable comprehensive warnings. Use this minimum set:
+
+```bash
+-Wall -Wextra -Wpedantic
+-Wshadow
+-Wformat=2
+-Wstrict-prototypes
+-Wold-style-definition
+-Wmissing-include-dirs
+-Wredundant-decls
+-Wnested-externs
+-Wwrite-strings
+```
+
+For development builds, treat warnings as errors:
+```bash
+-Werror
+```
+
+**Important**: Only use `-Werror` in development. Avoid in production builds due to compiler version differences.
+
+## GCC-Specific Additional Warnings
+
+When using GCC, add:
+```bash
+-Wjump-misses-init -Wlogical-op
+```
+
+## Memory Safety Flags
+
+For legacy code or complex pointer operations:
+```bash
+-fno-strict-aliasing
+-Wstrict-overflow
+```
+
+## Optimization Guidelines
+
+- Use `-O2` as the default optimization level
+- Consider `-Os` for size-critical applications (embedded systems)
+- Use `-march=native` only when targeting specific hardware
+- Enable Link Time Optimization with `-flto` for production builds
+
+```bash
+# Development
+gcc -std=c11 -Wall -Wextra -O2 src.c
+
+# Production with LTO
+gcc -std=c11 -O2 -flto -c module1.c -o module1.o
+gcc -std=c11 -O2 -flto -c module2.c -o module2.o
+gcc -O2 -flto module1.o module2.o -o program
+```
+
+## Code Formatting and Analysis
+
+- Use `clang-format` for consistent code formatting
+- Use `clang-tidy` for static analysis and automatic fixes
+- Run `clang-tidy` before `clang-format` in build pipelines
+
+Example `clang-format` configuration:
+```bash
+clang-format -i -style="{BasedOnStyle: llvm, IndentWidth: 4, AllowShortFunctionsOnASingleLine: None, KeepEmptyLinesAtTheStartOfBlocks: false}" *.c *.h
+```
+
+Example `clang-tidy` usage:
+```bash
+clang-tidy -fix -fix-errors -header-filter=.* --checks=readability-braces-around-statements,misc-macro-parentheses file.c -- -I.
+```
+
+## Build System Integration
+
+When setting up Makefiles or CMake:
+
+1. Always specify the C standard
+2. Include all recommended warning flags
+3. Separate debug and release configurations
+4. Enable LTO for release builds
+5. Include formatting and linting targets

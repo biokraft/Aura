@@ -1,0 +1,205 @@
+---
+description: Modern C types and memory management: Apply when working with C data types, memory allocation, or initialization
+globs: **/*.c, **/*.h
+alwaysApply: false
+---
+
+# Modern C Types and Memory Management Guidelines
+
+When working with C code, follow these modern practices for types and memory management:
+
+## Standard Integer Types
+
+**Always use fixed-width integer types from `<stdint.h>`** instead of built-in types:
+
+```c
+#include <stdint.h>
+
+// Good: Fixed-width types
+int32_t user_id;
+uint64_t account_balance;
+uint8_t flags;
+
+// Avoid: Platform-dependent sizes
+int user_id;
+unsigned long long account_balance;
+unsigned char flags;
+```
+
+### Integer Type Guidelines
+
+- **Signed integers**: `int8_t`, `int16_t`, `int32_t`, `int64_t`
+- **Unsigned integers**: `uint8_t`, `uint16_t`, `uint32_t`, `uint64_t`
+- **Avoid unsigned types** for general programming due to promotion rules
+- **Use `char` only** for string literals and legacy API compatibility
+- **Use `uint8_t`** when you mean "byte"
+
+## Pointer and Size Types
+
+### Use Appropriate Pointer-Related Types
+
+```c
+#include <stdint.h>
+#include <stddef.h>
+
+// Pointer arithmetic
+ptrdiff_t diff = (uintptr_t)ptr_new - (uintptr_t)ptr_old;
+
+// Sizes and counts
+size_t buffer_size = 1024;
+size_t num_elements = buffer_size / sizeof(int32_t);
+```
+
+- **`uintptr_t`**: For pointer arithmetic (not `long`)
+- **`ptrdiff_t`**: For pointer differences
+- **`size_t`**: For object sizes and counts
+
+## Variable Declaration and Initialization
+
+### Declare Variables Close to First Use
+
+```c
+// Good: Declare and initialize together
+void process_data(void) {
+    if (condition_check() != 0) {
+        return;
+    }
+    
+    int32_t count = get_count();  // Declared when needed
+    for (int32_t i = 0; i < count; i++) {  // Loop variable in scope
+        // Process data
+    }
+}
+
+// Avoid: Early declaration without initialization
+void process_data(void) {
+    int32_t count;  // Declared too early
+    int32_t i;      // Unnecessary scope pollution
+    
+    if (condition_check() != 0) {
+        return;
+    }
+    
+    count = get_count();
+    for (i = 0; i < count; i++) {
+        // Process data
+    }
+}
+```
+
+### Static Initialization
+
+Use `{0}` for zero-initialization:
+
+```c
+// Arrays
+uint32_t numbers[64] = {0};
+
+// Structs
+struct Point {
+    int32_t x;
+    int32_t y;
+};
+struct Point p = {0};
+```
+
+**Important**: `{0}` doesn't zero padding bytes. Use `memset` for complete zeroing:
+
+```c
+struct Point p;
+memset(&p, 0, sizeof(p));  // Zeros padding bytes too
+```
+
+### Designated Initializers
+
+Use designated initializers for clarity and maintainability:
+
+```c
+// Struct initialization
+struct Config config = {
+    .width = 800,
+    .height = 600,
+    .fullscreen = false
+    // Missing members are zero-initialized
+};
+
+// Array initialization
+int32_t values[10] = {
+    [0] = 1,
+    [5] = 10,
+    [9] = 100
+    // Other elements are zero
+};
+```
+
+## Memory Allocation
+
+### Prefer `calloc` over `malloc`
+
+```c
+// Good: Zero-initialized and overflow-safe
+int32_t *users = calloc(count, sizeof(int32_t));
+
+// Avoid: Uninitialized memory
+int32_t *users = malloc(count * sizeof(int32_t));
+```
+
+**Benefits of `calloc`**:
+1. Initializes memory to zero
+2. Checks for integer overflow in `count * size`
+
+### Avoid Variable-Length Arrays (VLAs)
+
+```c
+// Avoid: VLA can cause stack overflow
+void process_array(size_t n) {
+    int32_t array[n];  // Dangerous if n is large
+    // ...
+}
+
+// Good: Use heap allocation for dynamic arrays
+void process_array(size_t n) {
+    int32_t *array = calloc(n, sizeof(int32_t));
+    if (array == NULL) {
+        // Handle allocation failure
+        return;
+    }
+    // ... use array
+    free(array);
+}
+```
+
+## Printing Types
+
+Use proper format specifiers for standard types:
+
+```c
+#include <inttypes.h>
+
+// Standard types
+printf("Size: %zu\n", buffer_size);          // size_t
+printf("Difference: %td\n", ptr_diff);       // ptrdiff_t
+printf("Pointer: %p\n", (void*)ptr);         // pointer
+printf("Value: %" PRId32 "\n", int32_value); // int32_t
+printf("Count: %" PRIu64 "\n", uint64_value);// uint64_t
+```
+
+## Type Safety with Struct Wrappers
+
+For strong typing, wrap primitives in structs:
+
+```c
+// Weak typing (error-prone)
+typedef int32_t meters_t;
+typedef int32_t seconds_t;
+
+meters_t distance = 100;
+seconds_t time = distance;  // No error, but wrong!
+
+// Strong typing (compile-time safe)
+typedef struct { int32_t value; } meters_t;
+typedef struct { int32_t value; } seconds_t;
+
+meters_t distance = {100};
+seconds_t time = distance;  // Compile error!
+```
