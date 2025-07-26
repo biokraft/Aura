@@ -56,10 +56,13 @@ LIBRARIES := \
 	"XPT2046_Touchscreen@1.4" \
 	"lvgl@9.2.2"
 
+# ESP32 Platform version (compatible with the libraries above)
+ESP32_PLATFORM_VERSION := 2.0.17
+
 # Tool configuration
-CLANG_TIDY ?= $(shell which clang-tidy 2>/dev/null || which /opt/homebrew/opt/llvm/bin/clang-tidy 2>/dev/null || which /usr/local/opt/llvm/bin/clang-tidy 2>/dev/null || echo clang-tidy)
+CLANG_TIDY ?= clang-tidy
 CLANG_FORMAT ?= clang-format
-ARDUINO_LINT ?= $(shell which arduino-lint 2>/dev/null || which ./bin/arduino-lint 2>/dev/null || echo arduino-lint)
+ARDUINO_LINT ?= arduino-lint
 
 # Source files
 C_SOURCES := $(wildcard $(AURA_DIR)/*.c)
@@ -210,7 +213,7 @@ $(TMP_DIR)/.esp32-installed: $(TMP_DIR)/.arduino-cli-installed
 	@echo "📦 Updating package index..."
 	@$(ARDUINO_CLI) core update-index
 	@echo "📦 Installing ESP32 platform..."
-	@$(ARDUINO_CLI) core install esp32:esp32
+	@$(ARDUINO_CLI) core install esp32:esp32@$(ESP32_PLATFORM_VERSION)
 	@touch $@
 	@echo "✅ ESP32 board support installed!"
 .PHONY: install/esp32
