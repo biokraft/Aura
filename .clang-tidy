@@ -1,0 +1,54 @@
+---
+# Clang-Tidy configuration for Aura ESP32 project
+# Embedded C development with Arduino framework
+
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  misc-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -cert-dcl21-cpp,
+  -cert-dcl58-cpp,
+  -cert-err34-c,
+  -readability-function-cognitive-complexity,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -misc-non-private-member-variables-in-classes,
+  -misc-include-cleaner
+
+# Warnings as errors for CI (disable for local development)
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '(aura/.*\.h|aura/.*\.hpp|aura/.*\.c|aura/.*\.cpp)'
+
+CheckOptions:
+  # Readability
+  readability-braces-around-statements.ShortStatementLines: 2
+  readability-function-size.LineThreshold: 80
+  readability-function-size.StatementThreshold: 50
+  readability-function-size.BranchThreshold: 12
+  readability-function-size.ParameterThreshold: 8
+  readability-function-size.NestingThreshold: 4
+  readability-function-size.VariableThreshold: 10
+  
+  # Performance
+  performance-move-const-arg.CheckTriviallyCopyableMove: false
+  
+  # Cert
+  cert-dcl16-c.NewSuffixes: 'L;LL;LU;LLU'
+  
+  # Bugprone
+  bugprone-argument-comment.StrictMode: false
+  bugprone-suspicious-string-compare.WarnOnImplicitComparison: true
+  bugprone-suspicious-string-compare.WarnOnLogicalNotComparison: true
+  
+  # Misc
+  misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
+
+FormatStyle: 'file' 
