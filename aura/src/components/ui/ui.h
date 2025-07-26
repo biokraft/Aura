@@ -16,6 +16,7 @@ public:
     
     // Screen management
     void createMainScreen();
+    void createWiFiConfigScreen();
     void createSettingsWindow();
     void createLocationWindow();
     

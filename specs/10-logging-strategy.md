@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This document defines the logging strategy for the Aura project to provide developers with clear, actionable insights into the application's runtime behavior, enhancing debugging and development workflows, particularly with `make watch`.
+This document defines the logging strategy for the Aura project to provide developers with clear, actionable insights into the application's runtime behavior, enhancing debugging and development workflows, particularly with `make monitor`.
 
 ## 2. Guiding Principles
 
@@ -59,4 +59,4 @@ Example:
 
 - A central logging component will be created in `src/components/logging/`.
 - Individual components (e.g., `display`, `weather`) will be provided with their own named logger instances (e.g., `display_logger`).
-- Log output will be directed to `Serial`, making it visible during `make watch`. 
+- Log output will be directed to `Serial`, making it visible during `make monitor`. 

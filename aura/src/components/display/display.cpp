@@ -42,29 +42,42 @@ void Display::setupTouchscreen() {
 void Display::setupLVGL() {
     // Initialize LVGL
     lv_init();
+    Serial.println("LVGL initialized");
     
     // Create display using LVGL 9.x API
     display = lv_display_create(SCREEN_WIDTH, SCREEN_HEIGHT);
+    Serial.printf("LVGL display created: %dx%d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
     
-    // Setup display buffers using new API
-    lv_display_set_buffers(display, draw_buf, NULL, DRAW_BUF_SIZE * sizeof(uint32_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    // Setup display buffers using new API - buffer size in bytes for RGB565
+    size_t buf_size = sizeof(draw_buf);
+    lv_display_set_buffers(display, draw_buf, NULL, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    Serial.printf("LVGL buffers set: size=%d bytes\n", buf_size);
     
     // Set display flush callback
     lv_display_set_flush_cb(display, disp_flush_cb);
+    Serial.println("LVGL flush callback set");
     
     // Setup input device (touchscreen) using new API
     indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
+    Serial.println("LVGL input device configured");
 }
 
 void Display::flush(const lv_area_t *area, uint8_t *color_p) {
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
     
+    // LVGL flush callback - drawing to TFT
+    
     tft.startWrite();
     tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.pushColors((uint16_t*)color_p, w * h, true);
+    
+    // LVGL 9.x with 16-bit color depth sends RGB565 data
+    // Cast uint8_t* to uint16_t* for RGB565 format
+    uint16_t* pixel_data = (uint16_t*)color_p;
+    tft.pushColors(pixel_data, w * h, true);
+    
     tft.endWrite();
     
     lv_display_flush_ready(display);

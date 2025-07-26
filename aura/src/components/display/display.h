@@ -33,7 +33,7 @@ private:
     TFT_eSPI tft;
     SPIClass touchscreenSPI;
     XPT2046_Touchscreen touchscreen;
-    uint32_t draw_buf[DRAW_BUF_SIZE / 4];
+    uint16_t draw_buf[DRAW_BUF_SIZE / 2];
     lv_display_t* display;
     lv_indev_t* indev;
     
