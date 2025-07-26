@@ -1,0 +1,238 @@
+---
+description: "Aura Logging System: Enforce consistent logging practices using the centralized logging module in ESP32/Arduino projects"
+globs: **/*.c, **/*.cpp, **/*.h, **/*.hpp, **/*.ino
+alwaysApply: false
+---
+# Aura Logging System Enforcement
+
+## Core Principle: Use Centralized Logging Module
+
+**MANDATORY: All logging in the Aura application MUST use the centralized logging system defined in [logging.h](mdc:aura/src/components/logging/logging.h) and [logging.cpp](mdc:aura/src/components/logging/logging.cpp).**
+
+## Required Include and Initialization
+
+### Include the Logging Header
+```cpp
+#include "components/logging/logging.h"
+```
+
+### Initialize Logging System
+In `setup()` or main initialization:
+```cpp
+void setup() {
+    // Initialize logging system first
+    logging_init();
+    
+    // Your other initialization code...
+}
+```
+
+## Component-Based Logging Usage
+
+### Use Component-Specific Macros (REQUIRED)
+
+**ALWAYS use the predefined component macros instead of direct ESP_LOG* calls:**
+
+```cpp
+// GOOD: Use component-specific macros
+LOG_DISPLAY_I("Display initialized successfully");
+LOG_WIFI_E("Failed to connect to WiFi: %s", error_msg);
+LOG_UI_D("Button pressed, value: %d", button_value);
+LOG_WEATHER_W("API response delayed: %d ms", delay_time);
+LOG_CONFIG_V("Configuration parameter: %s = %s", key, value);
+LOG_MAIN_I("System startup complete");
+
+// BAD: Direct ESP_LOG calls
+ESP_LOGI("DISPLAY", "Display initialized successfully");  // Don't use
+ESP_LOGE("WIFI", "Failed to connect");                   // Don't use
+```
+
+### Available Component Tags and Macros
+
+| Component | Tag | Available Macros |
+|-----------|-----|------------------|
+| Main Application | `TAG_MAIN` | `LOG_MAIN_E/W/I/D/V` |
+| Display & Touch | `TAG_DISPLAY` | `LOG_DISPLAY_E/W/I/D/V` |
+| User Interface | `TAG_UI` | `LOG_UI_E/W/I/D/V` |
+| Weather System | `TAG_WEATHER` | `LOG_WEATHER_E/W/I/D/V` |
+| WiFi Management | `TAG_WIFI` | `LOG_WIFI_E/W/I/D/V` |
+| Configuration | `TAG_CONFIG` | `LOG_CONFIG_E/W/I/D/V` |
+
+### Log Level Guidelines
+
+- **E (Error)**: Critical failures, system errors, hardware issues
+- **W (Warning)**: Unexpected conditions, recoverable errors, configuration issues  
+- **I (Info)**: Important system events, status changes, user actions
+- **D (Debug)**: Detailed debugging information, function entry/exit
+- **V (Verbose)**: Very detailed tracing, loop iterations, frequent events
+
+## Function Entry/Exit Tracing
+
+Use the provided utility macros for function tracing:
+
+```cpp
+void important_function() {
+    LOG_FUNCTION_ENTRY(TAG_DISPLAY);
+    
+    // Function implementation
+    
+    LOG_FUNCTION_EXIT(TAG_DISPLAY);
+}
+```
+
+## Memory and System Monitoring
+
+Use the provided utility macros for system diagnostics:
+
+```cpp
+void check_system_health() {
+    LOG_MEMORY_INFO(TAG_MAIN);           // Log heap information
+    LOG_TASK_STACK_INFO(TAG_MAIN);       // Log stack usage
+}
+```
+
+## Forbidden Logging Practices
+
+### DO NOT USE These Methods
+
+```cpp
+// FORBIDDEN: Arduino Serial logging
+Serial.print("Debug message");          // Never use
+Serial.println("Status update");        // Never use
+
+// FORBIDDEN: Direct printf/sprintf
+printf("Temperature: %d\n", temp);      // Never use
+
+// FORBIDDEN: Direct ESP_LOG without component macros
+ESP_LOGI("TAG", "Message");             // Use component macros instead
+
+// FORBIDDEN: Hard-coded log tags
+ESP_LOGI("MyTag", "Message");           // Use predefined component tags
+```
+
+## Runtime Log Level Management
+
+The logging system supports runtime configuration via serial commands:
+
+```cpp
+// In your serial command handler
+void handle_serial_input(String command) {
+    logging_handle_serial_command(command.c_str());
+}
+```
+
+Available commands:
+- `log_level <level>` - Set global log level
+- `log_component <tag> <level>` - Set component-specific level
+- `log_status` - Show current configuration
+- `log_help` - Display available commands
+
+## Error Handling with Logging
+
+Always log errors with appropriate context:
+
+```cpp
+// GOOD: Comprehensive error logging
+bool connect_wifi(const char* ssid) {
+    LOG_WIFI_I("Attempting to connect to WiFi: %s", ssid);
+    
+    if (!wifi_init()) {
+        LOG_WIFI_E("WiFi initialization failed");
+        return false;
+    }
+    
+    if (!wifi_connect(ssid)) {
+        LOG_WIFI_E("Failed to connect to SSID: %s", ssid);
+        LOG_WIFI_W("Retrying connection in 5 seconds...");
+        return false;
+    }
+    
+    LOG_WIFI_I("Successfully connected to WiFi");
+    LOG_MEMORY_INFO(TAG_WIFI);  // Log system state after connection
+    return true;
+}
+```
+
+## Performance Considerations
+
+### Compile-Time Optimization
+The logging system uses ESP-IDF's compile-time filtering. Debug and verbose logs are automatically removed in release builds.
+
+### Runtime Efficiency
+- Component-specific macros have minimal overhead
+- Log level checking is optimized
+- String formatting only occurs when log level is active
+
+## Code Review Checklist
+
+Before submitting code, verify:
+
+- [ ] All logging uses component-specific macros (`LOG_COMPONENT_LEVEL`)
+- [ ] No direct `Serial.print`, `printf`, or `ESP_LOG*` calls
+- [ ] Appropriate log levels are used (Error for failures, Info for status, Debug for details)
+- [ ] `logging_init()` is called during system initialization
+- [ ] Error conditions include sufficient context in log messages
+- [ ] Memory/system state is logged during critical operations
+
+## Integration Examples
+
+### Display Component
+```cpp
+#include "components/logging/logging.h"
+
+bool display_init() {
+    LOG_DISPLAY_I("Initializing display subsystem");
+    
+    if (!init_tft()) {
+        LOG_DISPLAY_E("TFT initialization failed");
+        return false;
+    }
+    
+    LOG_DISPLAY_D("TFT initialized, configuring backlight");
+    configure_backlight();
+    
+    LOG_DISPLAY_I("Display initialization complete");
+    LOG_MEMORY_INFO(TAG_DISPLAY);
+    return true;
+}
+```
+
+### Weather Component
+```cpp
+#include "components/logging/logging.h"
+
+void fetch_weather_data() {
+    LOG_FUNCTION_ENTRY(TAG_WEATHER);
+    
+    LOG_WEATHER_I("Starting weather data fetch");
+    
+    if (!network_available()) {
+        LOG_WEATHER_W("Network unavailable, using cached data");
+        use_cached_weather_data();
+        return;
+    }
+    
+    WeatherData data = api_fetch_weather();
+    if (data.valid) {
+        LOG_WEATHER_I("Weather data updated: temp=%d°C, humidity=%d%%", 
+                      data.temperature, data.humidity);
+    } else {
+        LOG_WEATHER_E("Failed to fetch weather data from API");
+    }
+    
+    LOG_FUNCTION_EXIT(TAG_WEATHER);
+}
+```
+
+## Benefits of This Logging System
+
+1. **Consistent Formatting**: All logs follow the same format and timestamp
+2. **Component Isolation**: Easy filtering by component during debugging
+3. **Runtime Control**: Adjust log levels without recompiling
+4. **Performance**: Optimized for embedded systems with minimal overhead
+5. **Debugging**: Component-specific tags make issue isolation easier
+6. **Maintainability**: Centralized configuration and management
+
+Remember: Consistent logging is crucial for debugging embedded systems. Always use the centralized logging module for reliable diagnostics and troubleshooting.
+alwaysApply: false
+---
