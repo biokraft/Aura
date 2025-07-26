@@ -11,7 +11,7 @@
 
 Aura is a firmware for a DIY smart weather widget that runs on ESP32-2432S028R devices, commonly known as "Cheap Yellow Displays" (CYDs). It features a 2.8" touchscreen display, providing a rich, graphical interface for viewing current weather conditions, 7-day forecasts, and hourly outlooks.
 
-This repository contains the complete source code and a detailed guide for building and installing the Aura firmware. The beautiful 3D-printable case was designed by @biokraft, and you can find the design and assembly instructions on [MakerWorld](https://makerworld.com/en/models/1382304-aura-smart-weather-forecast-display).
+This repository contains the complete source code and a detailed guide for building and installing the Aura firmware. The beautiful 3D-printable case was designed by [Surrey-Homeware/Aura](https://github.com/Surrey-Homeware/Aura), and you can find the design and assembly instructions on [MakerWorld](https://makerworld.com/en/models/1382304-aura-smart-weather-forecast-display).
 
 ## ✨ Features
 
