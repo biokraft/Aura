@@ -18,6 +18,44 @@ AURA_DIR := $(PROJECT_DIR)/aura
 BUILD_DIR := $(PROJECT_DIR)/build
 TMP_DIR := $(PROJECT_DIR)/tmp
 
+# Arduino configuration
+ARDUINO_CLI ?= arduino-cli
+BOARD_FQBN := esp32:esp32:esp32:PartitionScheme=huge_app
+SKETCH_NAME := aura
+BAUD_RATE := 115200
+
+# Detect platform
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    PLATFORM := macos
+    ARDUINO_DIR := $(HOME)/Documents/Arduino
+    LIBRARIES_DIR := $(ARDUINO_DIR)/libraries
+endif
+ifeq ($(UNAME_S),Linux)
+    PLATFORM := linux
+    ARDUINO_DIR := $(HOME)/Arduino
+    LIBRARIES_DIR := $(ARDUINO_DIR)/libraries
+endif
+ifneq (,$(findstring MINGW,$(UNAME_S)))
+    PLATFORM := windows
+    ARDUINO_DIR := $(HOME)/Documents/Arduino
+    LIBRARIES_DIR := $(ARDUINO_DIR)/libraries
+endif
+ifneq (,$(findstring CYGWIN,$(UNAME_S)))
+    PLATFORM := windows
+    ARDUINO_DIR := $(HOME)/Documents/Arduino
+    LIBRARIES_DIR := $(ARDUINO_DIR)/libraries
+endif
+
+# Library versions (must match exactly)
+LIBRARIES := \
+	"ArduinoJson@7.4.1" \
+	"HttpClient@2.2.0" \
+	"TFT_eSPI@2.5.43" \
+	"WiFiManager@2.0.17" \
+	"XPT2046_Touchscreen@1.4" \
+	"lvgl@9.2.2"
+
 # Tool configuration
 CLANG_TIDY ?= clang-tidy
 CLANG_FORMAT ?= clang-format
@@ -39,6 +77,189 @@ ALL_SOURCES := $(C_SOURCES) $(CPP_SOURCES) $(INO_SOURCES) $(HEADER_SOURCES)
 help:
 	@awk '/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } /^## / { desc = substr($$0, 4); getline; if (match($$0, /^[a-zA-Z0-9_\/\-]+:/)) { target = substr($$0, 1, RLENGTH-1); printf "  \033[36m%-20s\033[0m %s\n", target, desc } } BEGIN { printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n" }' $(MAKEFILE_LIST)
 .PHONY: help
+
+##@ Arduino Development
+
+## install: Complete installation - Arduino CLI, libraries, configuration, and flash firmware.
+install: install/arduino-cli install/esp32 install/libraries configure flash
+	@echo "✅ Complete installation finished! Your Aura device should now be running."
+	@echo "📱 Connect to the 'Aura' WiFi network to configure your location and WiFi settings."
+.PHONY: install
+
+## compile: Compile the firmware without flashing.
+compile: check/arduino-cli $(TMP_DIR)/.libraries-installed $(TMP_DIR)/.configured
+	@echo "🔨 Compiling firmware..."
+	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" | head -1 | awk '{print $$1}' || echo ""); \
+	if [ -n "$$PORT" ]; then \
+		$(ARDUINO_CLI) compile --fqbn $(BOARD_FQBN) --port $$PORT $(AURA_DIR); \
+	else \
+		$(ARDUINO_CLI) compile --fqbn $(BOARD_FQBN) $(AURA_DIR); \
+	fi
+	@echo "✅ Compilation complete!"
+.PHONY: compile
+
+## flash: Flash the compiled firmware to the connected ESP32 device.
+flash: check/arduino-cli check/device compile
+	@echo "📡 Flashing firmware to device..."
+	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" | head -1 | awk '{print $$1}'); \
+	if [ -z "$$PORT" ]; then \
+		echo "❌ No ESP32 device found. Please connect your device and try again."; \
+		exit 1; \
+	fi; \
+	echo "🔌 Using port: $$PORT"; \
+	$(ARDUINO_CLI) upload --fqbn $(BOARD_FQBN) --port $$PORT $(AURA_DIR)
+	@echo "✅ Firmware flashed successfully!"
+	@echo "💡 Disconnect and reconnect power to start the device."
+.PHONY: flash
+
+## monitor: Monitor serial output from the ESP32 device.
+monitor: check/arduino-cli check/device
+	@echo "📺 Starting serial monitor (Ctrl+C to exit)..."
+	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" | head -1 | awk '{print $$1}'); \
+	if [ -z "$$PORT" ]; then \
+		echo "❌ No ESP32 device found. Please connect your device and try again."; \
+		exit 1; \
+	fi; \
+	echo "🔌 Monitoring port: $$PORT at $(BAUD_RATE) baud"; \
+	$(ARDUINO_CLI) monitor --port $$PORT --config baudrate=$(BAUD_RATE)
+.PHONY: monitor
+
+## configure: Copy configuration files to Arduino libraries.
+configure: $(TMP_DIR)/.configured
+$(TMP_DIR)/.configured: $(TMP_DIR)/.libraries-installed TFT_eSPI/User_Setup.h lvgl/src/lv_conf.h
+	@echo "⚙️  Configuring libraries..."
+	@mkdir -p $(TMP_DIR)
+	@if [ ! -d "$(LIBRARIES_DIR)" ]; then \
+		echo "❌ Arduino libraries directory not found: $(LIBRARIES_DIR)"; \
+		echo "💡 Please ensure Arduino CLI is properly configured."; \
+		exit 1; \
+	fi
+	@echo "📁 Configuring TFT_eSPI..."
+	@if [ -d "$(LIBRARIES_DIR)/TFT_eSPI" ]; then \
+		cp "$(LIBRARIES_DIR)/TFT_eSPI/User_Setup.h" "$(LIBRARIES_DIR)/TFT_eSPI/User_Setup.h.backup" 2>/dev/null || true; \
+		cp "TFT_eSPI/User_Setup.h" "$(LIBRARIES_DIR)/TFT_eSPI/User_Setup.h"; \
+		echo "✅ TFT_eSPI configured"; \
+	else \
+		echo "❌ TFT_eSPI library not found. Run 'make install/libraries' first."; \
+		exit 1; \
+	fi
+	@echo "📁 Configuring LVGL..."
+	@if [ -d "$(LIBRARIES_DIR)/lvgl/src" ]; then \
+		cp "$(LIBRARIES_DIR)/lvgl/src/lv_conf.h" "$(LIBRARIES_DIR)/lvgl/src/lv_conf.h.backup" 2>/dev/null || true; \
+		cp "lvgl/src/lv_conf.h" "$(LIBRARIES_DIR)/lvgl/src/lv_conf.h"; \
+		echo "✅ LVGL configured"; \
+	else \
+		echo "❌ LVGL library not found. Run 'make install/libraries' first."; \
+		exit 1; \
+	fi
+	@touch $@
+	@echo "✅ Library configuration complete!"
+.PHONY: configure
+
+##@ Installation Targets
+
+## install/arduino-cli: Install Arduino CLI.
+install/arduino-cli: $(TMP_DIR)/.arduino-cli-installed
+$(TMP_DIR)/.arduino-cli-installed:
+	@echo "🛠️  Installing Arduino CLI..."
+	@mkdir -p $(TMP_DIR)
+	@if command -v $(ARDUINO_CLI) >/dev/null 2>&1; then \
+		echo "✅ Arduino CLI already installed: $$($(ARDUINO_CLI) version)"; \
+		touch $@; \
+		exit 0; \
+	fi
+	@echo "📦 Installing Arduino CLI for $(PLATFORM)..."
+ifeq ($(PLATFORM),macos)
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install arduino-cli; \
+	else \
+		echo "❌ Homebrew not found. Please install Homebrew or Arduino CLI manually."; \
+		echo "💡 Visit: https://arduino.github.io/arduino-cli/installation/"; \
+		exit 1; \
+	fi
+else ifeq ($(PLATFORM),linux)
+	@if command -v snap >/dev/null 2>&1; then \
+		sudo snap install arduino-cli; \
+	elif command -v curl >/dev/null 2>&1; then \
+		curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh; \
+		sudo mv bin/arduino-cli /usr/local/bin/; \
+	else \
+		echo "❌ Please install arduino-cli manually for your Linux distribution."; \
+		echo "💡 Visit: https://arduino.github.io/arduino-cli/installation/"; \
+		exit 1; \
+	fi
+else ifeq ($(PLATFORM),windows)
+	@echo "❌ Automated installation not supported on Windows."; \
+	echo "💡 Please install Arduino CLI manually:"; \
+	echo "   - Using Chocolatey: choco install arduino-cli"; \
+	echo "   - Using Scoop: scoop install arduino-cli"; \
+	echo "   - Or download from: https://arduino.github.io/arduino-cli/installation/"; \
+	exit 1
+endif
+	@touch $@
+	@echo "✅ Arduino CLI installation complete!"
+.PHONY: install/arduino-cli
+
+## install/esp32: Install ESP32 board support.
+install/esp32: $(TMP_DIR)/.esp32-installed
+$(TMP_DIR)/.esp32-installed: $(TMP_DIR)/.arduino-cli-installed
+	@echo "🔧 Installing ESP32 board support..."
+	@mkdir -p $(TMP_DIR)
+	@$(ARDUINO_CLI) config init --dest-dir $(TMP_DIR) >/dev/null 2>&1 || true
+	@$(ARDUINO_CLI) config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+	@echo "📦 Updating package index..."
+	@$(ARDUINO_CLI) core update-index
+	@echo "📦 Installing ESP32 platform..."
+	@$(ARDUINO_CLI) core install esp32:esp32
+	@touch $@
+	@echo "✅ ESP32 board support installed!"
+.PHONY: install/esp32
+
+## install/libraries: Install all required Arduino libraries.
+install/libraries: $(TMP_DIR)/.libraries-installed
+$(TMP_DIR)/.libraries-installed: $(TMP_DIR)/.esp32-installed
+	@echo "📚 Installing Arduino libraries..."
+	@mkdir -p $(TMP_DIR)
+	@echo "📦 Installing libraries with specific versions..."
+	@for lib in $(LIBRARIES); do \
+		echo "  Installing $$lib..."; \
+		$(ARDUINO_CLI) lib install $$lib; \
+	done
+	@touch $@
+	@echo "✅ All libraries installed!"
+.PHONY: install/libraries
+
+##@ Device Management
+
+## check/device: Check if ESP32 device is connected.
+check/device:
+	@echo "🔍 Checking for connected ESP32 devices..."
+	@DEVICES=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" || true); \
+	if [ -z "$$DEVICES" ]; then \
+		echo "❌ No ESP32 device found."; \
+		echo "💡 Please ensure:"; \
+		echo "   1. ESP32 is connected via USB"; \
+		echo "   2. USB cable supports data transfer"; \
+		echo "   3. ESP32 drivers are installed"; \
+		echo "   4. Device permissions are correct (Linux: add user to dialout group)"; \
+		exit 1; \
+	else \
+		echo "✅ ESP32 device(s) found:"; \
+		echo "$$DEVICES"; \
+	fi
+.PHONY: check/device
+
+## list/devices: List all connected Arduino-compatible devices.
+list/devices: check/arduino-cli
+	@echo "🔍 Scanning for connected devices..."
+	@$(ARDUINO_CLI) board list
+.PHONY: list/devices
+
+## list/libraries: List installed Arduino libraries.
+list/libraries: check/arduino-cli
+	@echo "📚 Installed Arduino libraries:"
+	@$(ARDUINO_CLI) lib list
+.PHONY: list/libraries
 
 ##@ Setup and Dependencies
 
@@ -197,7 +418,7 @@ format/fix:
 		fi; \
 		echo '{' >> $(TMP_DIR)/compile_commands.json; \
 		echo '  "directory": "$(PROJECT_DIR)",' >> $(TMP_DIR)/compile_commands.json; \
-		echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) $$file",' >> $(TMP_DIR)/compile_commands.json; \
+		echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) -I$(PROJECT_DIR)/lvgl/src -I$(PROJECT_DIR)/TFT_eSPI $$file",' >> $(TMP_DIR)/compile_commands.json; \
 		echo '  "file": "$$file"' >> $(TMP_DIR)/compile_commands.json; \
 		echo '}' >> $(TMP_DIR)/compile_commands.json; \
 	done
@@ -321,8 +542,24 @@ clean:
 	@echo "✅ Clean complete!"
 .PHONY: clean
 
-## check-tools: Verify that all required tools are available.
-check-tools:
+## check: Verify that all required tools are available.
+check: check/arduino-cli check/tools
+	@echo "✅ All required tools are available!"
+.PHONY: check
+
+## check/arduino-cli: Check if Arduino CLI is installed and configured.
+check/arduino-cli:
+	@echo "🔧 Checking Arduino CLI..."
+	@if ! command -v $(ARDUINO_CLI) >/dev/null 2>&1; then \
+		echo "❌ Arduino CLI not found."; \
+		echo "💡 Run 'make install/arduino-cli' to install it."; \
+		exit 1; \
+	fi
+	@echo "✅ Arduino CLI: $$($(ARDUINO_CLI) version | head -1)"
+.PHONY: check/arduino-cli
+
+## check/tools: Verify that all required tools are available.
+check/tools:
 	@echo "🔧 Checking required tools..."
 	@tools_missing=false; \
 	if ! command -v $(CLANG_TIDY) >/dev/null 2>&1; then \
@@ -348,5 +585,4 @@ check-tools:
 		echo "Run 'make setup' to install missing tools."; \
 		exit 1; \
 	fi
-	@echo "✅ All required tools are available!"
-.PHONY: check-tools 
+.PHONY: check/tools 

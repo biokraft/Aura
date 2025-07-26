@@ -5,4 +5,5 @@
 # Linting and build artifacts
 build/
 tmp/
+bin/
 *.bak
