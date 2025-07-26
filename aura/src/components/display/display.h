@@ -38,6 +38,12 @@ private:
     // Use smaller buffers in fast internal SRAM (30 lines worth)
     static constexpr int BUFFER_LINES = 30;
     static constexpr int BUFFER_SIZE = SCREEN_WIDTH * BUFFER_LINES;
+    
+    // Define DMA_ATTR if not already defined
+    #ifndef DMA_ATTR
+    #define DMA_ATTR DRAM_ATTR
+    #endif
+    
     static lv_color_t draw_buf_1[BUFFER_SIZE] DMA_ATTR;
     static lv_color_t draw_buf_2[BUFFER_SIZE] DMA_ATTR;  // Double buffer for better performance
     

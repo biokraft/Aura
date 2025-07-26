@@ -35,11 +35,22 @@ unsigned long last_memory_report = 0;
 void printMemoryStatus() {
     size_t free_heap = esp_get_free_heap_size();
     size_t min_free_heap = esp_get_minimum_free_heap_size();
+    size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
     
     Serial.printf("=== Memory Status ===\n");
-    Serial.printf("Free heap: %d bytes\n", free_heap);
-    Serial.printf("Minimum free heap: %d bytes\n", min_free_heap);
-    Serial.printf("Heap fragmentation: %d%%\n", 100 - (free_heap * 100) / heap_caps_get_total_size(MALLOC_CAP_DEFAULT));
+    Serial.printf("Free heap: %u bytes\n", (unsigned int)free_heap);
+    Serial.printf("Minimum free heap: %u bytes\n", (unsigned int)min_free_heap);
+    
+    // Safe fragmentation calculation with bounds checking
+    if (total_heap > 0 && free_heap <= total_heap) {
+        unsigned int fragmentation = (unsigned int)(100 - (free_heap * 100) / total_heap);
+        Serial.printf("Heap fragmentation: %u%%\n", fragmentation);
+    } else {
+        Serial.printf("Heap fragmentation: N/A\n");
+    }
+    
+    Serial.printf("Total heap: %u bytes\n", (unsigned int)total_heap);
+    Serial.printf("PSRAM available: %s\n", heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0 ? "Yes" : "No");
     Serial.printf("=====================\n");
 }
 

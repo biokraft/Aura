@@ -301,14 +301,18 @@ bool UI::createClockDisplay() {
 }
 
 bool UI::createWeatherIcon() {
-    // Today's weather icon - original v1.0.1 position
+    // Today's weather icon - positioned left of temperature display
     img_today_icon = lv_image_create(main_screen);
     if (!img_today_icon) {
         LOG_UI_E("Failed to create weather icon");
         return false;
     }
     
-    lv_obj_align(img_today_icon, LV_ALIGN_TOP_MID, -64, 4); // Original v1.0.1 position
+    // Position to the left of temperature (temperature is at CENTER+45, so icon at CENTER-30)
+    lv_obj_align(img_today_icon, LV_ALIGN_TOP_MID, -30, 25); // Left of temperature
+    
+    // Set default icon
+    lv_image_set_src(img_today_icon, &icon_partly_cloudy);
     
     LOG_UI_I("Weather icon created successfully");
     return true;
@@ -447,7 +451,12 @@ void UI::createDailyForecastBox() {
             lv_obj_set_style_text_font(lbl_daily_high[i], getFont16(), LV_PART_MAIN);
             lv_obj_set_style_text_color(lbl_daily_high[i], lv_color_white(), LV_PART_MAIN);
             lv_obj_align(lbl_daily_high[i], LV_ALIGN_TOP_RIGHT, 0, i * 24); // Original position
-            lv_label_set_text(lbl_daily_high[i], "24°");
+            
+            // Generate varied sample temperatures (will be replaced by real data)
+            int sample_high = 22 + (i % 5) - 2; // Varies between 20-24°C
+            char temp_str[8];
+            snprintf(temp_str, sizeof(temp_str), "%d°", sample_high);
+            lv_label_set_text(lbl_daily_high[i], temp_str);
         }
         
         // Low temperature - right side with offset
@@ -456,7 +465,12 @@ void UI::createDailyForecastBox() {
             lv_obj_set_style_text_font(lbl_daily_low[i], getFont16(), LV_PART_MAIN);
             lv_obj_set_style_text_color(lbl_daily_low[i], lv_color_hex(0xb9ecff), LV_PART_MAIN);
             lv_obj_align(lbl_daily_low[i], LV_ALIGN_TOP_RIGHT, -50, i * 24); // Original position
-            lv_label_set_text(lbl_daily_low[i], "18°");
+            
+            // Generate varied sample temperatures (will be replaced by real data)
+            int sample_low = 16 + (i % 4) - 1; // Varies between 15-18°C  
+            char temp_str[8];
+            snprintf(temp_str, sizeof(temp_str), "%d°", sample_low);
+            lv_label_set_text(lbl_daily_low[i], temp_str);
         }
         
         // Weather icon - center left
@@ -514,7 +528,12 @@ void UI::createHourlyForecastBox() {
             lv_obj_set_style_text_font(lbl_hourly_temp[i], getFont16(), LV_PART_MAIN);
             lv_obj_set_style_text_color(lbl_hourly_temp[i], lv_color_white(), LV_PART_MAIN);
             lv_obj_align(lbl_hourly_temp[i], LV_ALIGN_TOP_RIGHT, 0, i * 24); // Original position
-            lv_label_set_text(lbl_hourly_temp[i], "22°");
+            
+            // Generate varied sample temperatures (will be replaced by real data)
+            int sample_temp = 20 + (i % 6) - 1; // Varies between 19-24°C
+            char temp_str[8];
+            snprintf(temp_str, sizeof(temp_str), "%d°", sample_temp);
+            lv_label_set_text(lbl_hourly_temp[i], temp_str);
         }
         
         // Precipitation probability - right side with offset
@@ -523,7 +542,12 @@ void UI::createHourlyForecastBox() {
             lv_obj_set_style_text_font(lbl_precipitation_probability[i], getFont16(), LV_PART_MAIN);
             lv_obj_set_style_text_color(lbl_precipitation_probability[i], lv_color_hex(0xb9ecff), LV_PART_MAIN);
             lv_obj_align(lbl_precipitation_probability[i], LV_ALIGN_TOP_RIGHT, -55, i * 24); // Original position
-            lv_label_set_text(lbl_precipitation_probability[i], "10%");
+            
+            // Generate varied sample precipitation (will be replaced by real data)
+            int sample_precip = (i * 7) % 30; // Varies between 0-29%
+            char precip_str[8];
+            snprintf(precip_str, sizeof(precip_str), "%d%%", sample_precip);
+            lv_label_set_text(lbl_precipitation_probability[i], precip_str);
         }
         
         // Weather icon - center left
@@ -601,10 +625,12 @@ void UI::updateLocation(const String& locationName) {
 }
 
 void UI::updateBackground(int wmo_code, int is_day) {
-    if (main_screen) {
-        const lv_image_dsc_t* bg_image = chooseImage(wmo_code, is_day);
-        if (bg_image) {
-            lv_obj_set_style_bg_image_src(main_screen, bg_image, LV_PART_MAIN);
+    // Update the weather icon instead of background image
+    if (img_today_icon) {
+        const lv_image_dsc_t* weather_icon = chooseIcon(wmo_code, is_day);
+        if (weather_icon) {
+            lv_image_set_src(img_today_icon, weather_icon);
+            LOG_UI_I("Weather icon updated for code %d, day=%d", wmo_code, is_day);
         }
     }
 }
