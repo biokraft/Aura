@@ -1,4 +1,5 @@
 #include "weather.h"
+#include "../logging/logging.h"
 
 Weather::Weather() : dataValid(false), lastUpdateTime(0) {
     // Initialize weather data
@@ -10,38 +11,56 @@ Weather::~Weather() {
 }
 
 bool Weather::init() {
+    LOG_FUNCTION_ENTRY(TAG_WEATHER);
+    LOG_WEATHER_I("Initializing weather component...");
+    
     // Initialize preferences
     if (!prefs.begin("aura_settings", false)) {
+        LOG_WEATHER_E("Failed to initialize preferences storage");
         return false;
     }
+    LOG_WEATHER_D("Preferences storage initialized");
     
     // Load saved settings
     loadSettings();
+    LOG_WEATHER_I("Weather component initialized successfully");
     
+    LOG_FUNCTION_EXIT(TAG_WEATHER);
     return true;
 }
 
 bool Weather::fetchWeatherData() {
+    LOG_FUNCTION_ENTRY(TAG_WEATHER);
+    LOG_WEATHER_I("Fetching weather data...");
+    
     if (!isWiFiConnected()) {
+        LOG_WEATHER_W("WiFi not connected, skipping weather update");
         return false;
     }
     
     // Build API URL
     String apiUrl = buildWeatherApiUrl();
+    LOG_WEATHER_D("API URL: %s", apiUrl.c_str());
     
     // Make HTTP request
     String response = makeHttpRequest(apiUrl);
     if (response.length() == 0) {
+        LOG_WEATHER_E("Failed to fetch weather data - empty response");
         return false;
     }
+    LOG_WEATHER_V("Raw weather response: %s", response.c_str());
     
     // Parse response
     bool success = parseWeatherResponse(response);
     if (success) {
         lastUpdateTime = millis();
         dataValid = true;
+        LOG_WEATHER_I("Weather data updated successfully");
+    } else {
+        LOG_WEATHER_E("Failed to parse weather response");
     }
     
+    LOG_FUNCTION_EXIT(TAG_WEATHER);
     return success;
 }
 
@@ -63,14 +82,20 @@ bool Weather::updateLocation(const String& lat, const String& lon, const String&
 }
 
 bool Weather::searchLocations(const String& query, JsonArray& results) {
+    LOG_FUNCTION_ENTRY(TAG_WEATHER);
+    LOG_WEATHER_I("Searching for locations: %s", query.c_str());
+    
     if (!isWiFiConnected()) {
+        LOG_WEATHER_W("WiFi not connected, cannot search locations");
         return false;
     }
     
     String geoUrl = buildGeocodingUrl(query);
+    LOG_WEATHER_D("Geocoding URL: %s", geoUrl.c_str());
     String response = makeHttpRequest(geoUrl);
     
     if (response.length() == 0) {
+        LOG_WEATHER_E("Failed to fetch geocoding data - empty response");
         return false;
     }
     
@@ -79,18 +104,24 @@ bool Weather::searchLocations(const String& query, JsonArray& results) {
     DeserializationError error = deserializeJson(doc, response);
     
     if (error) {
+        LOG_WEATHER_E("Failed to parse geocoding JSON: %s", error.c_str());
         return false;
     }
     
     if (doc["results"].is<JsonArray>()) {
         results = doc["results"].as<JsonArray>();
+        LOG_WEATHER_I("Found %d location results", results.size());
         return true;
     }
     
+    LOG_WEATHER_W("No location results found in response");
     return false;
 }
 
 void Weather::loadSettings() {
+    LOG_FUNCTION_ENTRY(TAG_WEATHER);
+    LOG_WEATHER_D("Loading weather settings from preferences");
+    
     // Load location settings
     String savedLat = prefs.getString("latitude", LATITUDE_DEFAULT);
     String savedLon = prefs.getString("longitude", LONGITUDE_DEFAULT);
@@ -106,6 +137,12 @@ void Weather::loadSettings() {
     
     // Load language preference
     current_language = (Language)prefs.getInt("language", LANG_EN);
+    
+    LOG_WEATHER_I("Settings loaded - Location: %s (%s, %s), Units: %s, Time: %s",
+                  location.c_str(), latitude, longitude,
+                  use_fahrenheit ? "°F" : "°C",
+                  use_24_hour ? "24h" : "12h");
+    LOG_FUNCTION_EXIT(TAG_WEATHER);
 }
 
 void Weather::saveSettings() {
@@ -118,12 +155,17 @@ void Weather::saveSettings() {
 }
 
 bool Weather::parseWeatherResponse(const String& response) {
+    LOG_FUNCTION_ENTRY(TAG_WEATHER);
+    LOG_WEATHER_D("Parsing weather response (%d bytes)", response.length());
+    
     DynamicJsonDocument doc(16384);
     DeserializationError error = deserializeJson(doc, response);
     
     if (error) {
+        LOG_WEATHER_E("Failed to parse weather JSON: %s", error.c_str());
         return false;
     }
+    LOG_WEATHER_D("Weather JSON parsed successfully");
     
     // Parse current weather
     if (doc["current"].is<JsonObject>()) {
@@ -199,6 +241,9 @@ String Weather::buildGeocodingUrl(const String& query) {
 }
 
 String Weather::makeHttpRequest(const String& url) {
+    LOG_FUNCTION_ENTRY(TAG_WEATHER);
+    LOG_WEATHER_D("Making HTTP request to: %s", url.c_str());
+    
     HTTPClient http;
     http.begin(url);
     http.addHeader("User-Agent", "Aura Weather Display");
@@ -208,9 +253,13 @@ String Weather::makeHttpRequest(const String& url) {
     
     if (httpCode == HTTP_CODE_OK) {
         response = http.getString();
+        LOG_WEATHER_D("HTTP request successful, response size: %d bytes", response.length());
+    } else {
+        LOG_WEATHER_E("HTTP request failed with code: %d", httpCode);
     }
     
     http.end();
+    LOG_FUNCTION_EXIT(TAG_WEATHER);
     return response;
 }
 

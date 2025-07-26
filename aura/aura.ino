@@ -5,6 +5,7 @@
 #include "src/components/ui/ui.h"
 #include "src/components/weather/weather.h"
 #include "src/components/wifi/wifi.h"
+#include "src/components/logging/logging.h"
 #include "src/config.h"
 
 #include "esp_system.h"
@@ -32,23 +33,36 @@ unsigned long last_lvgl_update = 0;
 void setup() {
     // Initialize serial communication
     Serial.begin(115200);
+    
+    // Initialize logging system first
+    logging_init();
+    LOG_MAIN_I("=== Aura Weather Display Starting ===");
+    LOG_MAIN_I("Version: 1.0");
+    LOG_MEMORY_INFO(TAG_MAIN);
+    
     Serial.println("Aura Weather Display Starting...");
 
     // Initialize display first
+    LOG_MAIN_I("Initializing display...");
     if (!display.init()) {
+        LOG_MAIN_E("Display initialization failed!");
         Serial.println("ERROR: Display initialization failed!");
         while (1); // Halt on critical error
     }
+    LOG_MAIN_I("Display initialized successfully");
     Serial.println("Display initialized successfully");
 
     // Initialize UI now that LVGL is confirmed working
+    LOG_MAIN_I("Initializing UI...");
     if (!ui.init(&display)) {
+        LOG_MAIN_E("UI initialization failed!");
         Serial.println("ERROR: UI initialization failed!");
         while (1); // Halt on critical error
     }
     
     // Set UI language from global setting
     ui.setLanguage(current_language);
+    LOG_MAIN_I("UI initialized successfully");
     Serial.println("UI initialized successfully");
 
     // Show WiFi configuration screen first
@@ -113,6 +127,17 @@ void setup() {
 
 void loop() {
     unsigned long current_time = millis();
+
+    // Handle serial commands for logging control
+    if (Serial.available()) {
+        String command = Serial.readStringUntil('\n');
+        command.trim();
+        
+        if (command.startsWith("log_")) {
+            logging_handle_serial_command(command.c_str());
+        }
+        // Add other command handling here in the future
+    }
 
     // Handle LVGL timer (high frequency)
     if (current_time - last_lvgl_update >= 5) {

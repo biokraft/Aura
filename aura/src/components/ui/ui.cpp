@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "../logging/logging.h"
 #include <Arduino.h>
 #include <time.h>
 
@@ -163,13 +164,17 @@ UI::~UI() {
 }
 
 bool UI::init(Display* display) {
+    LOG_FUNCTION_ENTRY(TAG_UI);
+    LOG_UI_I("Initializing UI component...");
+    
     if (!display) {
-        Serial.println("ERROR: Display reference is null");
+        LOG_UI_E("Display reference is null");
         return false;
     }
     
     display_ref = display;
-    Serial.println("UI initialization completed successfully");
+    LOG_UI_I("UI initialization completed successfully");
+    LOG_FUNCTION_EXIT(TAG_UI);
     return true;
 }
 
@@ -179,7 +184,7 @@ void UI::cleanupMainScreen() {
     if (main_screen) {
         lv_obj_del(main_screen);
         main_screen = nullptr;
-        Serial.println("Main screen cleaned up");
+        LOG_UI_D("Main screen cleaned up");
     }
     
     // Reset all pointers to nullptr for safety
@@ -210,33 +215,33 @@ void UI::createMainScreen() {
     // Create main screen
     main_screen = lv_obj_create(NULL);
     if (!main_screen) {
-        Serial.println("ERROR: Failed to create main screen");
+        LOG_UI_E("Failed to create main screen");
         return;
     }
-    Serial.println("Main screen created successfully");
+    LOG_UI_I("Main screen created successfully");
     
     // Set background to dark gradient (like original design)
     lv_obj_set_style_bg_color(main_screen, lv_color_hex(0x2c5282), LV_PART_MAIN);
     lv_obj_set_style_bg_grad_color(main_screen, lv_color_hex(0x1a202c), LV_PART_MAIN);
     lv_obj_set_style_bg_grad_dir(main_screen, LV_GRAD_DIR_VER, LV_PART_MAIN);
-    Serial.println("Main screen background gradient applied");
+    LOG_UI_D("Main screen background gradient applied");
     
     // Add event handler for screen interactions
     lv_obj_add_event_cb(main_screen, screenEventHandler, LV_EVENT_CLICKED, NULL);
     
     // Create UI elements with error checking
     if (!createTemperatureDisplay()) {
-        Serial.println("ERROR: Failed to create temperature display");
+        LOG_UI_E("Failed to create temperature display");
         return;
     }
     
     if (!createClockDisplay()) {
-        Serial.println("ERROR: Failed to create clock display");
+        LOG_UI_E("Failed to create clock display");
         return;
     }
     
     if (!createWeatherIcon()) {
-        Serial.println("ERROR: Failed to create weather icon");
+        LOG_UI_E("Failed to create weather icon");
         return;
     }
     
@@ -246,14 +251,14 @@ void UI::createMainScreen() {
     
     // Load the screen
     lv_screen_load(main_screen);
-    Serial.println("Main screen loaded and displayed");
+    LOG_UI_I("Main screen loaded and displayed");
 }
 
 bool UI::createTemperatureDisplay() {
     // Temperature label (large) - original v1.0.1 position
     lbl_today_temp = lv_label_create(main_screen);
     if (!lbl_today_temp) {
-        Serial.println("ERROR: Failed to create temperature label");
+        LOG_UI_E("Failed to create temperature label");
         return false;
     }
     
@@ -265,7 +270,7 @@ bool UI::createTemperatureDisplay() {
     // Feels like label - original v1.0.1 position  
     lbl_today_feels_like = lv_label_create(main_screen);
     if (!lbl_today_feels_like) {
-        Serial.println("ERROR: Failed to create feels-like label");
+        LOG_UI_E("Failed to create feels-like label");
         return false;
     }
     
@@ -274,7 +279,7 @@ bool UI::createTemperatureDisplay() {
     lv_label_set_text(lbl_today_feels_like, ""); // Start empty, will be set by updateTemperature
     lv_obj_align(lbl_today_feels_like, LV_ALIGN_TOP_MID, 45, 75); // Original v1.0.1 position
     
-    Serial.println("Temperature display created successfully");
+    LOG_UI_I("Temperature display created successfully");
     return true;
 }
 
@@ -282,7 +287,7 @@ bool UI::createClockDisplay() {
     // Clock label - original v1.0.1 position in top-right corner
     lbl_clock = lv_label_create(main_screen);
     if (!lbl_clock) {
-        Serial.println("ERROR: Failed to create clock label");
+        LOG_UI_E("Failed to create clock label");
         return false;
     }
     
@@ -291,7 +296,7 @@ bool UI::createClockDisplay() {
     lv_label_set_text(lbl_clock, "");
     lv_obj_align(lbl_clock, LV_ALIGN_TOP_RIGHT, -10, 5); // Original v1.0.1 position
     
-    Serial.println("Clock display created successfully");
+    LOG_UI_I("Clock display created successfully");
     return true;
 }
 
@@ -299,13 +304,13 @@ bool UI::createWeatherIcon() {
     // Today's weather icon - original v1.0.1 position
     img_today_icon = lv_image_create(main_screen);
     if (!img_today_icon) {
-        Serial.println("ERROR: Failed to create weather icon");
+        LOG_UI_E("Failed to create weather icon");
         return false;
     }
     
     lv_obj_align(img_today_icon, LV_ALIGN_TOP_MID, -64, 4); // Original v1.0.1 position
     
-    Serial.println("Weather icon created successfully");
+    LOG_UI_I("Weather icon created successfully");
     return true;
 }
 
@@ -316,7 +321,7 @@ void UI::createWiFiConfigScreen() {
     // Create WiFi configuration screen
     lv_obj_t* wifi_screen = lv_obj_create(NULL);
     if (!wifi_screen) {
-        Serial.println("ERROR: Failed to create WiFi config screen");
+        LOG_UI_E("Failed to create WiFi config screen");
         return;
     }
     
@@ -349,7 +354,7 @@ void UI::createWiFiConfigScreen() {
     
     // Load the WiFi screen
     lv_screen_load(wifi_screen);
-    Serial.println("WiFi configuration screen displayed");
+    LOG_UI_I("WiFi configuration screen displayed");
 }
 
 void UI::createDailyForecastBox() {
@@ -365,7 +370,7 @@ void UI::createDailyForecastBox() {
     // Daily forecast container - original v1.0.1 styling
     box_daily = lv_obj_create(main_screen);
     if (!box_daily) {
-        Serial.println("ERROR: Failed to create daily forecast box");
+        LOG_UI_E("Failed to create daily forecast box");
         return;
     }
     
@@ -424,14 +429,14 @@ void UI::createDailyForecastBox() {
         }
     }
     
-    Serial.println("Daily forecast box created with original v1.0.1 layout");
+    LOG_UI_I("Daily forecast box created with original v1.0.1 layout");
 }
 
 void UI::createHourlyForecastBox() {
     // Hourly forecast container - initially hidden (original v1.0.1 behavior)
     box_hourly = lv_obj_create(main_screen);
     if (!box_hourly) {
-        Serial.println("ERROR: Failed to create hourly forecast box");
+        LOG_UI_E("Failed to create hourly forecast box");
         return;
     }
     
@@ -494,25 +499,25 @@ void UI::createHourlyForecastBox() {
     // Start with hourly box hidden (original v1.0.1 behavior)
     lv_obj_add_flag(box_hourly, LV_OBJ_FLAG_HIDDEN);
     
-    Serial.println("Hourly forecast box created with original v1.0.1 layout");
+    LOG_UI_I("Hourly forecast box created with original v1.0.1 layout");
 }
 
 void UI::createSettingsWindow() {
     // Implementation for settings window would be created here
     // For now, just create a simple placeholder
-    Serial.println("Settings window creation not yet implemented");
+    LOG_UI_W("Settings window creation not yet implemented");
 }
 
 void UI::createLocationWindow() {
     // Implementation for location window would be created here  
     // For now, just create a simple placeholder
-    Serial.println("Location window creation not yet implemented");
+    LOG_UI_W("Location window creation not yet implemented");
 }
 
 void UI::updateWeatherData(const JsonDocument& weatherData) {
     // Implementation for updating weather data
     // This would parse the JSON and update all UI elements
-    Serial.println("Weather data update not yet implemented");
+    LOG_UI_W("Weather data update not yet implemented");
 }
 
 void UI::updateClock() {
@@ -548,12 +553,12 @@ void UI::updateTemperature(float temp, float feelsLike) {
 void UI::updateForecast(const JsonArray& daily, const JsonArray& hourly) {
     // Implementation for updating forecast data
     // This would iterate through the arrays and update the forecast elements
-    Serial.println("Forecast update not yet implemented");
+    LOG_UI_W("Forecast update not yet implemented");
 }
 
 void UI::updateLocation(const String& locationName) {
     // Implementation for updating location display
-    Serial.println("Location update not yet implemented");
+    LOG_UI_W("Location update not yet implemented");
 }
 
 void UI::updateBackground(int wmo_code, int is_day) {
@@ -613,7 +618,7 @@ const LocalizedStrings* UI::getStrings() const {
 
 void UI::setLanguage(Language language) {
     current_language_ = language;
-    Serial.printf("UI language set to: %d\n", static_cast<int>(language));
+    LOG_UI_I("UI language set to: %d", static_cast<int>(language));
 }
 
 Language UI::getCurrentLanguage() const {
