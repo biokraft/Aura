@@ -5,7 +5,6 @@
 [![Platform](https://img.shields.io/badge/platform-ESP32-brightgreen.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Framework](https://img.shields.io/badge/framework-Arduino-00979D.svg)](https://www.arduino.cc/)
 [![UI Library](https://img.shields.io/badge/UI-LVGL-orange.svg)](https://lvgl.io/)
-[![build](https://github.com/seanbaufeld/Aura/actions/workflows/build.yml/badge.svg)](https://github.com/seanbaufeld/Aura/actions/workflows/build.yml)
 
 > **Note:** This is a private fork for personal development. The original project is from [Surrey-Homeware/Aura](https://github.com/Surrey-Homeware/Aura).
 
