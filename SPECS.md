@@ -15,12 +15,14 @@ This document serves as the central hub for all technical and functional specifi
 | 🏛️ [07-framework-architecture.md](specs/07-framework-architecture.md) | Provides an overview of the software architecture and key frameworks.       |
 | 🚌 [08-app-bus-schedule.md](specs/08-app-bus-schedule.md) | Details the application's internal event bus and message schedule.          |
 | 📂 [09-source-code-organization.md](specs/09-source-code-organization.md) | Defines the modular source code structure and organization.                 |
+| 🪵 [10-logging-strategy.md](specs/10-logging-strategy.md) | Defines the project's logging strategy and framework choice.                |
 
 ## 🚀 Implementation Plan
 
 | Phase | Focus Area | Key Deliverables | Related Specs | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | Source Code Restructuring | Reorganize the `aura` directory into a modular structure with `src`, `assets`, and `components`. | [09-source-code-organization.md](specs/09-source-code-organization.md) | TBD |
+| 2 | Logging System Implementation | Integrate `spdlog` for deferred/asynchronous logging to `Serial`. Create a central logging component and provide logger instances to other components. | [10-logging-strategy.md](specs/10-logging-strategy.md) | TBD |
 
 
 [⬅️ Back to Home](./README.md) 
