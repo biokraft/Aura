@@ -57,9 +57,9 @@ LIBRARIES := \
 	"lvgl@9.2.2"
 
 # Tool configuration
-CLANG_TIDY ?= clang-tidy
+CLANG_TIDY ?= $(shell which clang-tidy 2>/dev/null || which /opt/homebrew/opt/llvm/bin/clang-tidy 2>/dev/null || which /usr/local/opt/llvm/bin/clang-tidy 2>/dev/null || echo clang-tidy)
 CLANG_FORMAT ?= clang-format
-ARDUINO_LINT ?= arduino-lint
+ARDUINO_LINT ?= $(shell which arduino-lint 2>/dev/null || which ./bin/arduino-lint 2>/dev/null || echo arduino-lint)
 
 # Source files
 C_SOURCES := $(wildcard $(AURA_DIR)/*.c)
@@ -89,7 +89,7 @@ install: install/arduino-cli install/esp32 install/libraries configure flash
 ## compile: Compile the firmware without flashing.
 compile: check/arduino-cli $(TMP_DIR)/.libraries-installed $(TMP_DIR)/.configured
 	@echo "🔨 Compiling firmware..."
-	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" | head -1 | awk '{print $$1}' || echo ""); \
+	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM|cu\.usbserial)" | head -1 | awk '{print $$1}' || echo ""); \
 	if [ -n "$$PORT" ]; then \
 		$(ARDUINO_CLI) compile --fqbn $(BOARD_FQBN) --port $$PORT $(AURA_DIR); \
 	else \
@@ -101,7 +101,7 @@ compile: check/arduino-cli $(TMP_DIR)/.libraries-installed $(TMP_DIR)/.configure
 ## flash: Flash the compiled firmware to the connected ESP32 device.
 flash: check/arduino-cli check/device compile
 	@echo "📡 Flashing firmware to device..."
-	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" | head -1 | awk '{print $$1}'); \
+	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM|cu\.usbserial)" | head -1 | awk '{print $$1}'); \
 	if [ -z "$$PORT" ]; then \
 		echo "❌ No ESP32 device found. Please connect your device and try again."; \
 		exit 1; \
@@ -115,7 +115,7 @@ flash: check/arduino-cli check/device compile
 ## monitor: Monitor serial output from the ESP32 device.
 monitor: check/arduino-cli check/device
 	@echo "📺 Starting serial monitor (Ctrl+C to exit)..."
-	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" | head -1 | awk '{print $$1}'); \
+	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM|cu\.usbserial)" | head -1 | awk '{print $$1}'); \
 	if [ -z "$$PORT" ]; then \
 		echo "❌ No ESP32 device found. Please connect your device and try again."; \
 		exit 1; \
@@ -234,7 +234,7 @@ $(TMP_DIR)/.libraries-installed: $(TMP_DIR)/.esp32-installed
 ## check/device: Check if ESP32 device is connected.
 check/device:
 	@echo "🔍 Checking for connected ESP32 devices..."
-	@DEVICES=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM)" || true); \
+	@DEVICES=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM|cu\.usbserial)" || true); \
 	if [ -z "$$DEVICES" ]; then \
 		echo "❌ No ESP32 device found."; \
 		echo "💡 Please ensure:"; \
@@ -294,10 +294,15 @@ setup:
 	fi
 	@if ! command -v $(ARDUINO_LINT) >/dev/null 2>&1; then \
 		echo "Installing arduino-lint..."; \
-		if command -v go >/dev/null 2>&1; then \
-			go install github.com/arduino/arduino-lint@latest; \
+		if command -v curl >/dev/null 2>&1; then \
+			echo "Downloading arduino-lint binary..."; \
+			curl -fsSL https://raw.githubusercontent.com/arduino/arduino-lint/main/etc/install.sh | sh; \
+		elif command -v wget >/dev/null 2>&1; then \
+			echo "Downloading arduino-lint binary..."; \
+			wget -qO- https://raw.githubusercontent.com/arduino/arduino-lint/main/etc/install.sh | sh; \
 		else \
-			echo "📝 Please install Go and run: go install github.com/arduino/arduino-lint@latest"; \
+			echo "📝 Please install arduino-lint manually:"; \
+			echo "curl -fsSL https://raw.githubusercontent.com/arduino/arduino-lint/main/etc/install.sh | sh"; \
 			echo "Or download binary from: https://github.com/arduino/arduino-lint/releases"; \
 		fi; \
 	fi
@@ -461,7 +466,7 @@ $(BUILD_DIR)/lint-report.txt: $(ALL_SOURCES) .clang-tidy
 		fi; \
 		echo '{' >> $(TMP_DIR)/compile_commands.json; \
 		echo '  "directory": "$(PROJECT_DIR)",' >> $(TMP_DIR)/compile_commands.json; \
-		echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) $$file",' >> $(TMP_DIR)/compile_commands.json; \
+		echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) -I$(PROJECT_DIR)/lvgl/src -I$(PROJECT_DIR)/TFT_eSPI $$file",' >> $(TMP_DIR)/compile_commands.json; \
 		echo '  "file": "$$file"' >> $(TMP_DIR)/compile_commands.json; \
 		echo '}' >> $(TMP_DIR)/compile_commands.json; \
 	done
@@ -488,7 +493,7 @@ $(BUILD_DIR)/clang-tidy-report.html: $(ALL_SOURCES) .clang-tidy
 			fi; \
 			echo '{' >> $(TMP_DIR)/compile_commands.json; \
 			echo '  "directory": "$(PROJECT_DIR)",' >> $(TMP_DIR)/compile_commands.json; \
-			echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) $$file",' >> $(TMP_DIR)/compile_commands.json; \
+			echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) -I$(PROJECT_DIR)/lvgl/src -I$(PROJECT_DIR)/TFT_eSPI $$file",' >> $(TMP_DIR)/compile_commands.json; \
 			echo '  "file": "$$file"' >> $(TMP_DIR)/compile_commands.json; \
 			echo '}' >> $(TMP_DIR)/compile_commands.json; \
 		done; \
@@ -510,7 +515,7 @@ $(BUILD_DIR)/clang-tidy-report.html: $(ALL_SOURCES) .clang-tidy
 			fi; \
 			echo '{' >> $(TMP_DIR)/compile_commands.json; \
 			echo '  "directory": "$(PROJECT_DIR)",' >> $(TMP_DIR)/compile_commands.json; \
-			echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) $$file",' >> $(TMP_DIR)/compile_commands.json; \
+			echo '  "command": "clang++ -DARDUINO=10607 -DARDUINO_ESP32_DEV -DESP32 -I$(AURA_DIR) -I$(PROJECT_DIR)/lvgl/src -I$(PROJECT_DIR)/TFT_eSPI $$file",' >> $(TMP_DIR)/compile_commands.json; \
 			echo '  "file": "$$file"' >> $(TMP_DIR)/compile_commands.json; \
 			echo '}' >> $(TMP_DIR)/compile_commands.json; \
 		done; \
