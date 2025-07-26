@@ -14,5 +14,13 @@ This document serves as the central hub for all technical and functional specifi
 | 📚 [06-documentation.md](specs/06-documentation.md) | Guidelines for project documentation structure and maintenance.             |
 | 🏛️ [07-framework-architecture.md](specs/07-framework-architecture.md) | Provides an overview of the software architecture and key frameworks.       |
 | 🚌 [08-app-bus-schedule.md](specs/08-app-bus-schedule.md) | Details the application's internal event bus and message schedule.          |
+| 📂 [09-source-code-organization.md](specs/09-source-code-organization.md) | Defines the modular source code structure and organization.                 |
+
+## 🚀 Implementation Plan
+
+| Phase | Focus Area | Key Deliverables | Related Specs | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | Source Code Restructuring | Reorganize the `aura` directory into a modular structure with `src`, `assets`, and `components`. | [09-source-code-organization.md](specs/09-source-code-organization.md) | TBD |
+
 
 [⬅️ Back to Home](./README.md) 
