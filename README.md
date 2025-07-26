@@ -93,37 +93,7 @@ Once connected, you can set your location and customize settings by long-pressin
 
 ## Development
 
-The provided `Makefile` includes several commands to streamline development.
-
-### Common Commands
-
--   **Compile Firmware:**
-    ```bash
-    make compile
-    ```
--   **Flash to Device:**
-    ```bash
-    make flash
-    ```
--   **Monitor Serial Output:**
-    ```bash
-    make monitor
-    ```
--   **Clean Build Files:**
-    ```bash
-    make clean
-    ```
-
-### Font Asset Management
-
-The UI fonts are pre-compiled. If you add new special characters (e.g., for translations), you must regenerate the font files.
-
-1.  **Extract Characters:** Run the Python script to get a list of all unique non-ASCII characters.
-    ```bash
-    python3 aura/extract_unicode_chars.py aura/aura.ino
-    ```
-2.  **Generate New Font:** Copy the output characters into the [LVGL Font Converter](https://lvgl.io/tools/fontconverter) to generate a new C file.
-3.  **Replace Font File:** Replace the old font file in the `aura/` directory with the new one.
+For developers looking to contribute to the project, a detailed guide covering environment setup, code quality tools, and the complete list of `Makefile` commands is available in the [**Developer Guide**](./docs/DEVELOPMENT.md).
 
 ## Troubleshooting
 
