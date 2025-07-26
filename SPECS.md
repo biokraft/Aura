@@ -10,15 +10,18 @@ The application is built on the Arduino framework and utilizes the LVGL library 
 
 This table provides a central index for all detailed specification documents.
 
-| Filename                  | Description                                                  |
-| ------------------------- | ------------------------------------------------------------ |
-| `specs/01-hardware.md`    | Defines the target hardware, including the MCU, display, and pinout configurations. |
-| `specs/02-application.md` | Details the software architecture, libraries, data flow, and core application logic. |
-| `specs/03-ui-ux.md`       | Describes the user interface, screen layouts, interaction flows, and visual assets. |
+| Filename                          | Description                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| `specs/01-hardware.md`            | Defines the target hardware, including the MCU, display, and pinout.         |
+| `specs/02-application.md`         | Details the software architecture, libraries, data flow, and core logic.     |
+| `specs/03-ui-ux.md`               | Describes the user interface, screen layouts, interaction flows, and assets. |
+| `specs/04-build-and-environment.md` | Specifies the development environment, build process, and required tooling.  |
+| `specs/05-deployment.md`          | Outlines the firmware flashing process and first-time device setup.        |
 
 ## 3. Open Questions / Future Work
 
--   **Asset Management:** The current method of embedding fonts and images directly as C arrays is inefficient and makes updates difficult. A more scalable approach, such as storing assets on SPIFFS, should be considered.
--   **Error Handling:** The application's error handling for API failures or network issues could be improved to provide more user-friendly feedback.
--   **Extensibility:** Adding new features, such as air quality data or calendar integration, would require significant refactoring. A more modular architecture could facilitate future enhancements.
--   **Code Duplication:** The `choose_icon` and `choose_image` functions contain identical logic. This could be consolidated to reduce redundancy. 
+-   **Asset Management:** The workflow for updating fonts is manual and error-prone. The project would benefit from an automated build process that integrates the `extract_unicode_chars.py` script and the LVGL font converter. Storing assets on SPIFFS instead of compiling them into the binary should also be evaluated for better scalability.
+-   **Configuration Management:** The custom `User_Setup.h` and `lv_conf.h` files must be manually copied into library folders, which is fragile. Using a more robust build system like PlatformIO would allow for project-specific library configurations without modifying the original library source.
+-   **Error Handling:** The application's error handling for API failures or network issues could be improved to provide more user-friendly feedback on the display instead of just logging to the serial console.
+-   **Code Duplication:** The `choose_icon` and `choose_image` functions contain identical logic. This could be consolidated into a single function to reduce redundancy and improve maintainability.
+-   **Extensibility:** Adding new features, such as air quality data or calendar integration, would require significant refactoring. A more modular, object-oriented architecture could facilitate future enhancements. 
