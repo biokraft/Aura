@@ -7,6 +7,7 @@
 #include "src/config.h"
 
 #include "esp_system.h"
+#include <WiFi.h>
 #include <WiFiManager.h>
 #include <time.h>
 
@@ -189,10 +190,28 @@ void setup() {
   }
   Serial.println("Weather initialized successfully");
 
-  // Initialize WiFi
+  // Initialize WiFi with proper configuration
+  Serial.println("Configuring WiFi...");
+  
+  // Set unique device hostname
+  String uniqueHostname = generateUniqueHostname();
+  WiFi.setHostname(uniqueHostname.c_str());
+  Serial.println("Device hostname: " + uniqueHostname);
+  
+  // Configure WiFiManager
   WiFiManager wifiManager;
-  wifiManager.autoConnect(DEFAULT_CAPTIVE_SSID);
+  wifiManager.setAPCallback(apModeCallback);
+  
+  // Try to connect, will create AP if no saved credentials
+  if (!wifiManager.autoConnect(DEFAULT_CAPTIVE_SSID)) {
+    Serial.println("Failed to connect to WiFi");
+    // Restart and try again
+    ESP.restart();
+  }
+  
   Serial.println("WiFi connected successfully");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
 
   // Configure time
   configTime(0, 0, "pool.ntp.org");
@@ -249,14 +268,10 @@ void loop() {
 // Helper function implementations
 const LocalizedStrings *get_strings() {
   switch (current_language) {
-    case LANG_ES:
-      return &es_strings;
-    case LANG_DE:
-      return &de_strings;
-    case LANG_FR:
-      return &fr_strings;
-    default:
-      return &en_strings;
+    case LANG_ES: return &es_strings;
+    case LANG_DE: return &de_strings;
+    case LANG_FR: return &fr_strings;
+    default: return &en_strings;
   }
 }
 
@@ -278,6 +293,35 @@ const lv_font_t *get_font_20() {
 
 const lv_font_t *get_font_42() {
   return &lv_font_montserrat_latin_42;
+}
+
+// WiFi callback functions
+void apModeCallback(WiFiManager *mgr) {
+  Serial.println("Entering WiFi AP Mode");
+  // Update WiFi config screen to show AP mode instructions
+  ui.createWiFiConfigScreen();
+  lv_refr_now(NULL);
+}
+
+String generateUniqueHostname() {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  
+  // Create a simple hash from MAC address
+  uint32_t hash = 0;
+  for (int i = 0; i < 6; i++) {
+    hash = hash * 31 + mac[i];
+  }
+  
+  // Convert to 5-character alphanumeric string
+  String hashStr = "";
+  const char chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (int i = 0; i < 5; i++) {
+    hashStr += chars[hash % 36];
+    hash /= 36;
+  }
+  
+  return String(DEVICE_HOSTNAME) + "-" + hashStr;
 }
 
 const lv_image_dsc_t *choose_image(int wmo_code, int is_day) {

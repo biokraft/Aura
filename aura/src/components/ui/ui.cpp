@@ -73,13 +73,26 @@ void UI::createWiFiConfigScreen() {
     lv_obj_t* wifi_screen = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(wifi_screen, lv_color_hex(0x2c5282), LV_PART_MAIN);
     
-    // WiFi config message
-    lv_obj_t* lbl_wifi = lv_label_create(wifi_screen);
-    lv_obj_set_style_text_font(lbl_wifi, get_font_20(), LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_wifi, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_wifi, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(lbl_wifi, get_strings()->wifi_config);
-    lv_obj_center(lbl_wifi);
+    // Title
+    lv_obj_t* lbl_title = lv_label_create(wifi_screen);
+    lv_obj_set_style_text_font(lbl_title, get_font_20(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_title, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(lbl_title, get_strings()->wifi_config);
+    lv_obj_align(lbl_title, LV_ALIGN_TOP_MID, 0, 40);
+    
+    // Instructions
+    lv_obj_t* lbl_instructions = lv_label_create(wifi_screen);
+    lv_obj_set_style_text_font(lbl_instructions, get_font_14(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_instructions, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_instructions, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(lbl_instructions, SCREEN_WIDTH - 40);
+    lv_label_set_text(lbl_instructions, 
+        "1. Connect to 'Aura' WiFi\n"
+        "2. Open browser\n" 
+        "3. Go to 192.168.4.1\n"
+        "4. Configure your WiFi");
+    lv_obj_center(lbl_instructions);
     
     // Load the WiFi screen
     lv_screen_load(wifi_screen);
