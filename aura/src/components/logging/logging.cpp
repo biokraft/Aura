@@ -195,7 +195,7 @@ void logging_init_time(void) {
     }
     
     // Initialize SNTP
-    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, default_ntp_servers[0]);
     esp_sntp_setservername(1, default_ntp_servers[1]);
     esp_sntp_setservername(2, default_ntp_servers[2]);
