@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <lvgl.h>
+#include "components/logging/logging.h"
 
 // Hardware Pin Definitions
 #define XPT2046_IRQ 36  // T_IRQ
@@ -131,20 +132,5 @@ extern bool use_24_hour;
 extern char latitude[16];
 extern char longitude[16];
 extern String location;
-
-// Function Declarations
-// Language functions
-const LocalizedStrings *get_strings();
-
-// Font functions
-const lv_font_t *get_font_12();
-const lv_font_t *get_font_14();
-const lv_font_t *get_font_16();
-const lv_font_t *get_font_20();
-const lv_font_t *get_font_42();
-
-// Weather functions
-const lv_image_dsc_t *choose_image(int wmo_code, int is_day);
-const lv_image_dsc_t *choose_icon(int wmo_code, int is_day);
 
 #endif // CONFIG_H 

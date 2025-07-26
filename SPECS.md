@@ -21,8 +21,8 @@ This document serves as the central hub for all technical and functional specifi
 
 | Phase | Focus Area | Key Deliverables | Related Specs | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Source Code Restructuring | Reorganize the `aura` directory into a modular structure with `src`, `assets`, and `components`. | [09-source-code-organization.md](specs/09-source-code-organization.md) | TBD |
-| 2 | Logging System Implementation | Integrate `spdlog` for deferred/asynchronous logging to `Serial`. Create a central logging component and provide logger instances to other components. | [10-logging-strategy.md](specs/10-logging-strategy.md) | TBD |
+| 1 | Source Code Restructuring | Reorganize the `aura` directory into a modular structure with `src`, `assets`, and `components`. | [09-source-code-organization.md](specs/09-source-code-organization.md) | ✅ COMPLETED |
+| 2 | Logging System Implementation | Integrate the ESP-IDF `esp_log` library. Configure log levels and ensure all components use tagged logging to `Serial`. | [10-logging-strategy.md](specs/10-logging-strategy.md) | IN PROGRESS |
 
 
 [⬅️ Back to Home](./README.md) 

@@ -34,11 +34,30 @@ public:
     static void screenEventHandler(lv_event_t* e);
     static void locationEventHandler(lv_event_t* e);
     
+    // Localization functions (moved from main)
+    const LocalizedStrings* getStrings() const;
+    void setLanguage(Language language);
+    Language getCurrentLanguage() const;
+    
+    // Font management functions (moved from main)
+    const lv_font_t* getFont12() const;
+    const lv_font_t* getFont14() const;
+    const lv_font_t* getFont16() const;
+    const lv_font_t* getFont20() const;
+    const lv_font_t* getFont42() const;
+    
+    // Weather image/icon selection functions (moved from main)
+    const lv_image_dsc_t* chooseImage(int wmo_code, int is_day) const;
+    const lv_image_dsc_t* chooseIcon(int wmo_code, int is_day) const;
+    
     // Getters
     lv_obj_t* getMainScreen() { return main_screen; }
     
 private:
     Display* display_ref;
+    
+    // Current language state
+    Language current_language_;
     
     // Main screen elements
     lv_obj_t* main_screen;
@@ -83,6 +102,10 @@ private:
     bool createTemperatureDisplay();
     bool createClockDisplay();
     bool createWeatherIcon();
+    
+    // Language string storage
+    void initializeLanguageStrings();
+    const LocalizedStrings* getLanguageStrings(Language language) const;
     
     // Static instance for callbacks
     static UI* instance;

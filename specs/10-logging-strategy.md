@@ -11,52 +11,43 @@ The logging implementation will adhere to the best practices for embedded system
 - **Performance First**: Logging should have minimal impact on real-time operations.
 - **Clarity and Context**: Logs must be easy to understand and provide sufficient context.
 - **Configurability**: Log verbosity must be controllable at both compile-time and run-time.
+- **Resource Efficiency**: The logging framework should be optimized for the resource-constrained environment of the ESP32.
 
-## 3. Architecture: Deferred Logging
+## 3. Chosen Framework: ESP-IDF `esp_log`
 
-To meet performance requirements, a **deferred logging** architecture will be implemented.
+The project will use the **ESP-IDF's built-in `esp_log` library**, which is the standard and most efficient logging solution for the ESP32 platform.
 
-- **Capture**: In high-frequency or time-sensitive code (like the main loop or event handlers), log calls will only capture essential data (e.g., a message ID, timestamp, and parameters) and place it into a lightweight, lock-free ring buffer. This operation will be extremely fast and non-blocking.
-- **Processing**: A low-priority background task will be responsible for retrieving log data from the buffer, formatting it into human-readable strings, and writing it to the serial output.
+### Key Features and Configuration:
 
-## 4. Chosen Framework
+- **Log Version**: We will use **Log V2**, which offers improved flexibility, reduced binary size, and centralized log formatting over the legacy V1.
+- **Log Levels**: The standard `esp_log` levels will be used to control verbosity:
+  - `ESP_LOGE` - Error
+  - `ESP_LOGW` - Warning
+  - `ESP_LOGI` - Info
+  - `ESP_LOGD` - Debug
+  - `ESP_LOGV` - Verbose
+- **Compile-Time Verbosity**: The global maximum log level will be set via `CONFIG_LOG_MAXIMUM_LEVEL` in the `sdkconfig`.
+- **Runtime Verbosity**: The default runtime level will be set by `CONFIG_LOG_DEFAULT_LEVEL`. We will leverage `esp_log_level_set()` to allow dynamic, per-component log level changes at runtime, which can be triggered via a serial command for debugging.
+- **Performance**: For time-sensitive operations, we will use the standard `ESP_LOGx` macros. In contexts where interrupts are disabled or flash cache is inaccessible, the `ESP_DRAM_LOGx` macros will be used sparingly.
 
-Given the ESP32 platform and the need for a balance between performance and features, **`spdlog`** will be integrated and configured for asynchronous (deferred) logging.
+## 4. Log Format
 
-- It provides a type-safe API using `{fmt}`.
-- It has built-in support for asynchronous logging via a thread pool and queue.
-- It is highly configurable and well-supported.
+The standard `esp_log` format will be used, which includes:
 
-If `spdlog` proves to be too resource-intensive, a custom C++ deferred logger based on the principles in the `.cursor/rules/embedded-logging/` will be implemented as a fallback.
-
-## 5. Logging Levels
-
-The following standard log levels will be used:
-
-| Level   | Description                               | Use Case Example                    |
-|---------|-------------------------------------------|-------------------------------------|
-| `ERROR` | Critical system failures                  | Wi-Fi connection failed after retries |
-| `WARN`  | Unexpected but recoverable events         | API request timeout, will retry     |
-| `INFO`  | High-level application flow               | System initialized, Entering new state |
-| `DEBUG` | Detailed information for developers       | API response payload, function entry  |
-
-The default compile-time level will be `INFO`. The default runtime level will also be `INFO`, but it will be configurable via the serial console.
-
-## 6. Log Format
-
-The standard log format will be:
-`[%Y-%m-%d %H:%M:%S.%e] [%l] [%n] %v`
-
-- `[%Y-%m-%d %H:%M:%S.%e]`: Timestamp with milliseconds
-- `[%l]`: Log level (e.g., `info`, `error`)
-- `[%n]`: Logger name (e.g., `WiFi`, `WeatherAPI`)
-- `%v`: The log message
+- `L (T) TAG: message`
+- `L`: A single character representing the log level (e.g., `E`, `W`, `I`).
+- `T`: Milliseconds since boot.
+- `TAG`: A short string identifying the source of the log message (e.g., `WiFi`, `Weather`).
+- `message`: The log message itself.
 
 Example:
-`[2023-10-27 10:30:05.123] [info] [WiFi] Connecting to SSID...`
+`I (123) WiFi: Connecting to SSID...`
 
-## 7. Implementation Notes
+Color-coding will be enabled in `idf.py monitor` for improved readability during development.
 
-- A central logging component will be created in `src/components/logging/`.
-- Individual components (e.g., `display`, `weather`) will be provided with their own named logger instances (e.g., `display_logger`).
-- Log output will be directed to `Serial`, making it visible during `make monitor`. 
+## 5. Implementation Notes
+
+- **Component Tagging**: Each component (e.g., `display`, `weather`) will use a unique `TAG` for its log messages to allow for targeted filtering.
+- **Log Output**: All logs will be directed to the default UART, making them visible during `make monitor`.
+- **No Deferred Logging**: The built-in `esp_log` handles buffering and thread safety internally. A custom deferred logging architecture is not necessary.
+- **Central Component**: A central logging component is not required, as `esp_log` is globally available. Components will include `"esp_log.h"` and define their own `TAG`. 
