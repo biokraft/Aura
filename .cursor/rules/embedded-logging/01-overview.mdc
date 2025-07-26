@@ -1,0 +1,50 @@
+---
+description: Embedded logging best practices overview: Apply when working with logging systems in C/C++ embedded projects
+globs: **/*.c, **/*.cpp, **/*.h, **/*.hpp
+alwaysApply: false
+---
+# Embedded Logging Best Practices Overview
+
+## Core Principles
+
+Effective logging on embedded systems requires balancing visibility into system behavior with maintaining real-time performance constraints. The primary challenge is that traditional logging methods like `printf` are often too slow and resource-intensive for constrained environments.
+
+### Key Guidelines
+
+1. **Avoid `printf` in Performance-Critical Code**
+   - `printf` family functions perform expensive string formatting at call time
+   - Can cause significant latency issues in real-time systems
+   - Especially problematic in Interrupt Service Routines (ISRs)
+
+2. **Implement Deferred Logging Architecture**
+   - Separate log capture (fast) from log processing (slower)
+   - Use lightweight buffers in time-critical paths
+   - Process and format logs in background tasks
+
+3. **Use Logging Levels for Control**
+   - ERROR: Critical failures
+   - WARNING: Unexpected but non-fatal events
+   - INFO: High-level status messages
+   - DEBUG: Detailed debugging information
+
+4. **Consider Binary vs Text Formats**
+   - Binary: Extremely fast, compact, requires host-side decoder
+   - Text: Human-readable, but CPU and bandwidth intensive
+
+## Related Rules
+
+- [Deferred Logging Implementation](mdc:.cursor/rules/embedded-logging/02-deferred-patterns.mdc)
+- [Logging Levels and Configuration](mdc:.cursor/rules/embedded-logging/03-levels-config.mdc)
+- [Modern C++ Logging Patterns](mdc:.cursor/rules/embedded-logging/04-cpp-patterns.mdc)
+- [Framework Selection Guide](mdc:.cursor/rules/embedded-logging/05-frameworks.mdc)
+
+## Quick Decision Tree
+
+- **Real-time critical system?** → Use binary logging (TRICE) or high-performance library (xtr)
+- **General embedded C++?** → Use spdlog with deferred mode
+- **Custom solution needed?** → Follow deferred logging patterns
+- **Legacy C code?** → Implement ring buffer with background processing
+description:
+globs:
+alwaysApply: false
+---

@@ -1,0 +1,339 @@
+---
+description: LVGL ESP32 Best Practices: Apply when working with LVGL applications on ESP32 microcontrollers
+globs: **/*.c, **/*.h, **/*.cpp, **/*.hpp, **/CMakeLists.txt, **/Kconfig*, **/sdkconfig*, **/menuconfig*
+alwaysApply: false
+---
+# LVGL ESP32 Development Best Practices
+
+## Introduction
+
+This guide provides comprehensive best practices for building efficient LVGL applications on ESP32 devices. LVGL (Light and Versatile Graphics Library) is a powerful embedded graphics library, but requires careful optimization on resource-constrained microcontrollers like the ESP32.
+
+## Project Setup and Dependencies
+
+### Use ESP-IDF Framework
+
+Always use ESP-IDF (Espressif IoT Development Framework) for production LVGL applications:
+
+```bash
+# Install esp_lvgl_port component (recommended approach)
+idf.py add-dependency "espressif/esp_lvgl_port^2.3.0"
+
+# Alternative: Manual LVGL integration
+idf.py add-dependency "lvgl/lvgl^9.*"
+```
+
+### Display Driver Integration
+
+Add appropriate display drivers from ESP Registry:
+
+```bash
+# Example for GC9A01 circular display
+idf.py add-dependency "espressif/esp_lcd_gc9a01^2.0.0"
+
+# Example for ST7789 display
+idf.py add-dependency "espressif/esp_lcd_st7789^2.0.0"
+```
+
+### Configuration Management
+
+Configure LVGL through menuconfig:
+
+```bash
+idf.py menuconfig
+# Navigate to: Component config → LVGL configuration
+```
+
+Essential configuration options:
+- Display resolution
+- Color depth (typically 16-bit RGB565)
+- Buffer configuration
+- Font selection
+- Feature enablement
+
+## Memory Management and Performance Optimization
+
+### Buffer Strategy (Critical for Performance)
+
+**Problem**: ESP32 internal SRAM is limited (~520KB). Full-screen buffers often exceed this limit.
+
+**Solution**: Use partial refresh with small buffers in internal SRAM:
+
+```c
+// Good: Small buffer in fast internal SRAM
+#define BUFFER_LINES 30
+static lv_color_t buf_1[DISPLAY_WIDTH * BUFFER_LINES] DMA_ATTR;
+static lv_color_t buf_2[DISPLAY_WIDTH * BUFFER_LINES] DMA_ATTR;  // Optional double buffer
+
+// Configure display buffer
+static lv_disp_draw_buf_t draw_buf;
+lv_disp_draw_buf_init(&draw_buf, buf_1, buf_2, DISPLAY_WIDTH * BUFFER_LINES);
+```
+
+**Avoid**: Full-screen buffers that force external PSRAM usage:
+
+```c
+// Bad: Forces slow PSRAM usage
+static lv_color_t buf_1[DISPLAY_WIDTH * DISPLAY_HEIGHT];  // Too large!
+```
+
+### Color Depth Consistency
+
+Match asset color depth with display configuration:
+
+```c
+// In menuconfig: Set LVGL color depth to 16-bit
+// In image assets: Use LV_IMG_CF_TRUE_COLOR (16-bit) format
+const lv_img_dsc_t my_image = {
+    .header.cf = LV_IMG_CF_TRUE_COLOR,  // Matches display depth
+    .header.w = 64,
+    .header.h = 64,
+    .data = image_data
+};
+```
+
+### Hardware Acceleration
+
+Enable available acceleration features:
+
+```c
+// For ESP32-P4: Enable Pixel Processing Accelerator
+// In sdkconfig.defaults:
+CONFIG_LV_USE_PPA=y
+```
+
+## Display Interface Configuration
+
+### Use DMA for Display Transfers
+
+Configure display driver with DMA support:
+
+```c
+// ESP-LCD configuration with DMA
+esp_lcd_panel_io_spi_config_t io_config = {
+    .dc_gpio_num = GPIO_DC,
+    .cs_gpio_num = GPIO_CS,
+    .pclk_hz = 40000000,  // 40MHz SPI clock
+    .lcd_cmd_bits = 8,
+    .lcd_param_bits = 8,
+    .spi_mode = 0,
+    .trans_queue_depth = 10,
+    .flags = {
+        .dc_low_on_data = 0,
+    },
+};
+```
+
+### Interface Selection Priority
+
+1. **Parallel (I8080)**: Best performance for high-resolution displays
+2. **SPI**: Most common, optimize clock speed (40-80MHz)
+3. **Avoid slow interfaces**: 3-wire SPI significantly limits frame rate
+
+## Filesystem Integration
+
+### Enable STDIO File System
+
+Configure LVGL to use standard C file operations:
+
+```c
+// In menuconfig:
+// Component config → LVGL configuration → 3rd Party Libraries
+// Enable: "File system on top of stdio API"
+// Set drive letter to 65 (ASCII 'A')
+```
+
+### Partition Table Configuration
+
+Define filesystem partition in `partitions.csv`:
+
+```csv
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x6000,
+phy_init, data, phy,     0xf000,  0x1000,
+factory,  app,  factory, 0x10000, 1400K,
+storage,  data, spiffs,  ,        400K,
+```
+
+### Asset Loading Example
+
+```c
+#include "esp_spiffs.h"
+
+void setup_filesystem() {
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path = "/spiffs",
+        .partition_label = NULL,
+        .max_files = 5,
+        .format_if_mount_failed = false
+    };
+    
+    esp_vfs_spiffs_register(&conf);
+}
+
+void load_image_from_fs() {
+    lv_obj_t *img = lv_img_create(lv_scr_act());
+    lv_img_set_src(img, "A:/spiffs/logo.bin");
+    lv_obj_center(img);
+}
+```
+
+## Asset Optimization
+
+### Image Format Guidelines
+
+```c
+// Optimal image descriptor format
+const lv_img_dsc_t optimized_image = {
+    .header.always_zero = 0,
+    .header.w = 100,
+    .header.h = 100,
+    .header.cf = LV_IMG_CF_TRUE_COLOR,  // Match display depth
+    .data_size = sizeof(image_data),
+    .data = image_data
+};
+```
+
+### Font Configuration
+
+Use built-in fonts or convert custom fonts:
+
+```c
+// Use appropriate font sizes for performance
+LV_FONT_DECLARE(lv_font_montserrat_14);
+
+static lv_style_t style_text;
+lv_style_init(&style_text);
+lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
+```
+
+## Animation and UI Performance
+
+### Efficient Animation Patterns
+
+```c
+// Use LVGL's built-in animation system
+lv_anim_t anim;
+lv_anim_init(&anim);
+lv_anim_set_var(&anim, obj);
+lv_anim_set_values(&anim, 0, 100);
+lv_anim_set_time(&anim, 1000);
+lv_anim_set_exec_cb(&anim, (lv_anim_exec_xcb_t)lv_obj_set_x);
+lv_anim_start(&anim);
+```
+
+### Avoid Performance Pitfalls
+
+```c
+// Bad: Large images with frequent updates
+// Good: Split large animations into smaller segments
+// Bad: Complex transparency effects on large areas
+// Good: Use simple solid colors for backgrounds
+```
+
+## Configuration Templates
+
+### sdkconfig.defaults Example
+
+```ini
+# LVGL Configuration
+CONFIG_LV_USE_FS_STDIO=y
+CONFIG_LV_FS_STDIO_LETTER=65
+CONFIG_LV_FS_DEFAULT_DRIVER_LETTER=65
+
+# Display Configuration
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_DPI_DEF=130
+
+# Memory Configuration
+CONFIG_SPIRAM_SUPPORT=y
+CONFIG_SPIRAM_USE_MALLOC=y
+
+# Performance
+CONFIG_FREERTOS_HZ=1000
+CONFIG_ESP32_DEFAULT_CPU_FREQ_240=y
+```
+
+### CMakeLists.txt Integration
+
+```cmake
+# Main CMakeLists.txt
+cmake_minimum_required(VERSION 3.16)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(lvgl_app)
+
+# Component CMakeLists.txt
+idf_component_register(
+    SRCS "main.c" "ui/ui.c"
+    INCLUDE_DIRS "." "ui"
+    REQUIRES lvgl esp_lcd_touch esp_lvgl_port
+)
+```
+
+## Troubleshooting Common Issues
+
+### Low Frame Rate
+
+1. Check buffer size and location (internal SRAM vs PSRAM)
+2. Verify color depth matching between assets and display
+3. Optimize SPI/parallel interface speed
+4. Reduce animation complexity
+
+### Memory Issues
+
+1. Monitor heap usage with `esp_get_free_heap_size()`
+2. Use `DMA_ATTR` for display buffers
+3. Consider partial refresh for large displays
+4. Optimize image sizes and formats
+
+### Display Artifacts
+
+1. Verify electrical connections and signal integrity
+2. Check SPI clock speed compatibility
+3. Ensure proper power supply for display
+4. Validate buffer alignment and DMA configuration
+
+## Example Project Structure
+
+```
+project/
+├── main/
+│   ├── main.c
+│   ├── ui/
+│   │   ├── ui.h
+│   │   ├── ui.c
+│   │   └── screens/
+│   └── assets/
+│       ├── images/
+│       └── fonts/
+├── components/
+│   └── custom_driver/
+├── partitions.csv
+├── sdkconfig.defaults
+└── CMakeLists.txt
+```
+
+## Performance Benchmarking
+
+### FPS Measurement
+
+```c
+// Enable LVGL performance monitor
+#define LV_USE_PERF_MONITOR 1
+
+// In application
+lv_obj_t *perf_label = lv_label_create(lv_scr_act());
+lv_obj_align(perf_label, LV_ALIGN_TOP_LEFT, 10, 10);
+```
+
+### Memory Monitoring
+
+```c
+void print_memory_info() {
+    ESP_LOGI(TAG, "Free heap: %d bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free internal: %d bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    ESP_LOGI(TAG, "Free PSRAM: %d bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+}
+```
+
+Following these best practices will ensure optimal performance and stability for LVGL applications on ESP32 platforms.

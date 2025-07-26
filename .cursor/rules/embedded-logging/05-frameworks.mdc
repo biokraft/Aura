@@ -1,0 +1,305 @@
+---
+description: Embedded logging framework selection: Apply when choosing or evaluating logging frameworks for embedded systems
+globs: **/*.c, **/*.cpp, **/*.h, **/*.hpp
+alwaysApply: false
+---
+# Embedded Logging Framework Selection Guide
+
+## Quick Decision Matrix
+
+| System Type | Primary Requirement | Recommended Framework | Why |
+|-------------|-------------------|---------------------|-----|
+| Real-time critical | Ultra-low latency | TRICE | Binary format, ~6-8 CPU cycles |
+| High-performance | Low latency + features | xtr | Optimized for real-time, modern C++ |
+| General embedded C++ | Balance of features/performance | spdlog | Mature, feature-rich, good performance |
+| Legacy C systems | Simple integration | Custom deferred logger | Full control, minimal dependencies |
+| Memory constrained | Minimal footprint | TRICE or custom | TRICE <1KB, custom can be smaller |
+
+## Framework Detailed Analysis
+
+### TRICE - Binary Logging
+
+**Best For**: Real-time systems, ISR logging, ultra-constrained memory
+
+#### Advantages
+- **Extreme Performance**: Only 3-8 assembly instructions per log call
+- **Tiny Footprint**: Less than 1KB runtime code
+- **ISR Safe**: Safe to use in interrupt service routines
+- **Zero String Storage**: Format strings stored only on host
+- **Compile-time ID Generation**: Automatic management of message IDs
+
+#### Implementation Example
+```c
+#include "trice.h"
+
+// In your code
+TRICE(Id(12345), "Temperature: %d°C, Humidity: %d%%", temp, humidity);
+
+// Runtime overhead: Just copies ID + raw values to buffer
+// Host tool decodes using pre-compiled format string database
+```
+
+#### Trade-offs
+- Requires pre-compilation step
+- Needs host-side decoder tool
+- Less flexibility for dynamic messages
+- Development workflow slightly more complex
+
+#### When to Use
+- Real-time control systems
+- Safety-critical applications
+- Severe memory constraints
+- High-frequency logging in ISRs
+
+### xtr - High-Performance C++ Logger
+
+**Best For**: Low-latency C++ applications, financial systems, game engines
+
+#### Advantages
+- **Consistently Fast**: Every call is fast, not just average
+- **No Allocations**: Never allocates memory during logging
+- **Background Processing**: All formatting/I/O in separate thread
+- **Modern C++**: Uses C++20 features, type-safe
+- **io_uring Support**: High-throughput I/O on Linux
+
+#### Implementation Example
+```cpp
+#include <xtr/logger.hpp>
+
+auto logger = xtr::logger("app");
+logger.info("Processing {} items", item_count);  // ~2-3ns overhead
+
+// All formatting and I/O happens in background thread
+```
+
+#### Trade-offs
+- C++ only
+- Newer library (smaller community)
+- Linux-focused (limited platform support)
+- Requires modern compiler (C++17+)
+
+#### When to Use
+- Low-latency C++ applications
+- High-throughput logging requirements
+- Modern C++ codebases
+- Linux-based embedded systems
+
+### spdlog - Feature-Rich C++ Logger
+
+**Best For**: General embedded C++ projects, rapid development
+
+#### Advantages
+- **Mature and Stable**: Widely adopted, well-tested
+- **Rich Feature Set**: Multiple sinks, formatters, patterns
+- **Excellent Documentation**: Comprehensive examples and guides
+- **Header-Only Option**: Easy integration
+- **Active Community**: Regular updates, good support
+
+#### Implementation Example
+```cpp
+#include "spdlog/spdlog.h"
+#include "spdlog/async.h"
+
+// Setup async logging for better performance
+spdlog::init_thread_pool(8192, 1);
+auto logger = spdlog::basic_logger_mt<spdlog::async_factory>("async_logger", "log.txt");
+
+logger->info("System started, version {}", version);
+logger->error("Sensor fault: {}", error_code);
+```
+
+#### Trade-offs
+- Larger memory footprint than minimal solutions
+- Performance not optimal for real-time systems
+- C++ only
+- Feature richness can be overwhelming
+
+#### When to Use
+- General embedded C++ applications
+- Rapid prototyping and development
+- Applications needing multiple log outputs
+- Teams familiar with modern C++
+
+### Custom Deferred Logger
+
+**Best For**: Legacy C systems, specific requirements, full control
+
+#### Advantages
+- **Full Control**: Customize every aspect
+- **Minimal Dependencies**: No external libraries
+- **Language Agnostic**: Works with C and C++
+- **Optimized for Your Use Case**: Tailor to specific needs
+
+#### Basic Implementation Template
+```c
+// Ring buffer for fast capture
+typedef struct {
+    uint32_t timestamp;
+    uint8_t level;
+    uint16_t format_id;
+    uint8_t params[32];
+    uint8_t param_count;
+} log_entry_t;
+
+// Fast capture function (ISR-safe)
+bool log_fast(uint8_t level, uint16_t format_id, ...) {
+    if (!should_log(level)) return true;
+    
+    // Disable interrupts briefly
+    disable_interrupts();
+    
+    // Copy to ring buffer (minimal work)
+    log_entry_t* entry = get_next_buffer_slot();
+    if (!entry) {
+        enable_interrupts();
+        return false; // Buffer full
+    }
+    
+    entry->timestamp = get_fast_timestamp();
+    entry->level = level;
+    entry->format_id = format_id;
+    // Serialize parameters...
+    
+    advance_buffer_head();
+    enable_interrupts();
+    return true;
+}
+
+// Background processing
+void process_log_buffer() {
+    while (has_pending_logs()) {
+        log_entry_t* entry = get_next_log();
+        format_and_output(entry);
+        mark_processed(entry);
+    }
+}
+```
+
+#### Trade-offs
+- Development time investment
+- Need to implement all features yourself
+- Maintenance burden
+- Potential for bugs in custom implementation
+
+#### When to Use
+- Legacy C codebases
+- Very specific performance requirements
+- Minimal external dependencies required
+- Educational purposes
+
+## Integration Strategies
+
+### RTOS Integration
+
+#### FreeRTOS Example
+```c
+// Dedicated logging task
+void logging_task(void* params) {
+    TickType_t last_wake = xTaskGetTickCount();
+    
+    while (1) {
+        process_pending_logs();
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10)); // Process every 10ms
+    }
+}
+
+// Create task with appropriate priority
+xTaskCreate(logging_task, "LOGGING", 2048, NULL, 
+           tskIDLE_PRIORITY + 1, &logging_task_handle);
+```
+
+### Bare Metal Integration
+```c
+// In main loop
+int main() {
+    init_logging();
+    
+    while (1) {
+        // Your application logic
+        handle_sensors();
+        update_actuators();
+        
+        // Process logs periodically
+        static uint32_t last_log_process = 0;
+        if (get_system_time() - last_log_process > 10) {
+            process_pending_logs();
+            last_log_process = get_system_time();
+        }
+    }
+}
+```
+
+## Performance Benchmarks Summary
+
+| Framework | Latency (fast path) | Memory Usage | CPU Usage | Compile Size |
+|-----------|-------------------|--------------|-----------|--------------|
+| TRICE | 6-8 cycles | <1KB | Minimal | <1KB |
+| xtr | 2-3ns | ~4KB | Low | Medium |
+| spdlog (async) | 10-20ns | 8-16KB | Medium | Large |
+| Custom deferred | 5-15 cycles | Variable | Low | Variable |
+| printf (comparison) | 1000-5000ns | Variable | High | Large |
+
+## Selection Flowchart
+
+1. **Is ultra-low latency critical (< 10 CPU cycles)?**
+   - Yes → TRICE
+   - No → Continue
+
+2. **Are you using C++17 or later?**
+   - Yes → Continue to 3
+   - No → Custom C implementation
+
+3. **Do you need extensive features (multiple sinks, formatters)?**
+   - Yes → spdlog
+   - No → Continue to 4
+
+4. **Is this a high-performance/low-latency C++ application?**
+   - Yes → xtr
+   - No → spdlog (for ease of use)
+
+## Migration Strategies
+
+### From printf to Framework
+```c
+// Before
+printf("Temperature: %d°C\n", temp);
+
+// After (TRICE)
+TRICE(Id(0), "Temperature: %d°C\n", temp);
+
+// After (spdlog)
+logger->info("Temperature: {}°C", temp);
+
+// After (custom)
+LOG_INFO(FMT_TEMPERATURE, temp);
+```
+
+### Gradual Migration
+1. **Phase 1**: Replace critical path logging (ISRs, hot loops)
+2. **Phase 2**: Replace initialization and error logging  
+3. **Phase 3**: Replace remaining printf calls
+4. **Phase 4**: Add advanced features (levels, filtering)
+
+## Common Pitfalls to Avoid
+
+### Framework Selection Mistakes
+- Choosing feature-rich library for simple needs
+- Ignoring real-time requirements
+- Not considering team expertise
+- Overlooking platform constraints
+
+### Implementation Mistakes
+- Logging in ISRs without proper framework
+- Not sizing buffers for worst-case scenarios
+- Forgetting to handle buffer overflow
+- Mixing synchronous and asynchronous logging
+
+### Performance Mistakes
+- Logging too much in release builds
+- Not using compile-time level filtering
+- Formatting expensive data unnecessarily
+- Blocking on slow I/O in critical paths
+description:
+globs:
+alwaysApply: false
+---

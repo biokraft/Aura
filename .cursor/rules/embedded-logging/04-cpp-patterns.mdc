@@ -1,0 +1,435 @@
+---
+description: Modern C++ logging patterns: Apply when implementing logging systems using modern C++ features
+globs: **/*.cpp, **/*.hpp
+alwaysApply: false
+---
+# Modern C++ Logging Patterns
+
+## Stream-Based Logging Interface
+
+### Type-Safe Stream Logger
+
+```cpp
+template<typename Sink>
+class StreamLogger {
+private:
+    Sink& sink_;
+    LogLevel level_;
+    std::ostringstream buffer_;
+    bool active_;
+
+public:
+    StreamLogger(Sink& sink, LogLevel level) 
+        : sink_(sink), level_(level), active_(sink.should_log(level)) {}
+    
+    ~StreamLogger() {
+        if (active_) {
+            sink_.write(level_, buffer_.str());
+        }
+    }
+    
+    template<typename T>
+    StreamLogger& operator<<(T&& value) {
+        if (active_) {
+            buffer_ << std::forward<T>(value);
+        }
+        return *this;
+    }
+    
+    // Support for std::endl and other manipulators
+    StreamLogger& operator<<(std::ostream& (*manip)(std::ostream&)) {
+        if (active_) {
+            buffer_ << manip;
+        }
+        return *this;
+    }
+};
+
+// Macro for convenient usage
+#define LOG_STREAM(sink, level) StreamLogger(sink, level)
+
+// Usage
+LOG_STREAM(console_sink, LogLevel::INFO) << "Temperature: " << temp << "°C";
+```
+
+### Format-Based Modern Logging
+
+```cpp
+#include <format> // C++20 or fmt library
+
+template<typename Sink>
+class FormatLogger {
+private:
+    Sink& sink_;
+    
+public:
+    explicit FormatLogger(Sink& sink) : sink_(sink) {}
+    
+    template<LogLevel Level, typename... Args>
+    void log(std::string_view format_str, Args&&... args) {
+        if constexpr (Level <= COMPILE_TIME_LOG_LEVEL) {
+            if (sink_.should_log(Level)) {
+                // Use std::format (C++20) or fmt::format
+                std::string message = std::format(format_str, std::forward<Args>(args)...);
+                sink_.write(Level, std::move(message));
+            }
+        }
+    }
+    
+    template<typename... Args>
+    void error(std::string_view format_str, Args&&... args) {
+        log<LogLevel::ERROR>(format_str, std::forward<Args>(args)...);
+    }
+    
+    template<typename... Args>
+    void warning(std::string_view format_str, Args&&... args) {
+        log<LogLevel::WARNING>(format_str, std::forward<Args>(args)...);
+    }
+    
+    template<typename... Args>
+    void info(std::string_view format_str, Args&&... args) {
+        log<LogLevel::INFO>(format_str, std::forward<Args>(args)...);
+    }
+    
+    template<typename... Args>
+    void debug(std::string_view format_str, Args&&... args) {
+        log<LogLevel::DEBUG>(format_str, std::forward<Args>(args)...);
+    }
+};
+
+// Usage
+FormatLogger logger(sink);
+logger.info("Processing {} items, progress: {:.1f}%", count, progress);
+```
+
+## RAII-Based Scope Logging
+
+### Automatic Function Tracing
+
+```cpp
+class ScopeTracer {
+private:
+    std::string function_name_;
+    std::chrono::steady_clock::time_point start_time_;
+    LogLevel level_;
+    
+public:
+    template<typename Logger>
+    ScopeTracer(Logger& logger, LogLevel level, std::string_view function_name)
+        : function_name_(function_name), start_time_(std::chrono::steady_clock::now()), level_(level) {
+        
+        if (logger.should_log(level)) {
+            logger.log(level, "Entering {}", function_name_);
+        }
+    }
+    
+    template<typename Logger>
+    ~ScopeTracer() {
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time_);
+        
+        // Assuming logger is available via some global or thread-local mechanism
+        auto& logger = get_current_logger();
+        if (logger.should_log(level_)) {
+            logger.log(level_, "Exiting {} (took {}μs)", function_name_, duration.count());
+        }
+    }
+};
+
+#define LOG_FUNCTION_TRACE(logger, level) \
+    ScopeTracer _tracer(logger, level, __FUNCTION__)
+
+// Usage
+void process_data() {
+    LOG_FUNCTION_TRACE(my_logger, LogLevel::DEBUG);
+    // Function implementation
+}
+```
+
+## Template Metaprogramming for Performance
+
+### Compile-Time Log Level Filtering
+
+```cpp
+template<LogLevel Level, LogLevel CompileLevel = LogLevel::INFO>
+struct LogEnabled {
+    static constexpr bool value = Level <= CompileLevel;
+};
+
+template<LogLevel CompileLevel = LogLevel::INFO>
+class MetaLogger {
+public:
+    template<LogLevel Level, typename... Args>
+    void log(std::string_view format, Args&&... args) {
+        if constexpr (LogEnabled<Level, CompileLevel>::value) {
+            if (should_log_runtime(Level)) {
+                write_log(Level, format, std::forward<Args>(args)...);
+            }
+        }
+        // If Level > CompileLevel, entire function body is optimized away
+    }
+    
+private:
+    bool should_log_runtime(LogLevel level) const {
+        return level <= runtime_level_;
+    }
+    
+    template<typename... Args>
+    void write_log(LogLevel level, std::string_view format, Args&&... args) {
+        // Actual logging implementation
+    }
+    
+    LogLevel runtime_level_ = LogLevel::INFO;
+};
+```
+
+### Type-Safe Parameter Serialization
+
+```cpp
+template<typename T>
+struct LogSerializer {
+    static void serialize(std::ostream& os, const T& value) {
+        os << value; // Default: use stream operator
+    }
+};
+
+// Specializations for complex types
+template<>
+struct LogSerializer<std::chrono::system_clock::time_point> {
+    static void serialize(std::ostream& os, const std::chrono::system_clock::time_point& tp) {
+        auto time_t = std::chrono::system_clock::to_time_t(tp);
+        os << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+    }
+};
+
+template<typename T>
+struct LogSerializer<std::vector<T>> {
+    static void serialize(std::ostream& os, const std::vector<T>& vec) {
+        os << "[";
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (i > 0) os << ", ";
+            LogSerializer<T>::serialize(os, vec[i]);
+        }
+        os << "]";
+    }
+};
+
+// Usage in logger
+template<typename T>
+void log_value(const T& value) {
+    std::ostringstream oss;
+    LogSerializer<T>::serialize(oss, value);
+    write_log(oss.str());
+}
+```
+
+## Memory-Efficient Logging
+
+### Static String Optimization
+
+```cpp
+// Compile-time string hashing
+constexpr uint32_t hash_string(const char* str) {
+    uint32_t hash = 5381;
+    while (*str) {
+        hash = ((hash << 5) + hash) + *str++;
+    }
+    return hash;
+}
+
+// String interning for repeated format strings
+class StringInterner {
+private:
+    std::unordered_map<uint32_t, std::string_view> interned_strings_;
+    
+public:
+    template<size_t N>
+    uint32_t intern(const char (&str)[N]) {
+        constexpr uint32_t hash = hash_string(str);
+        interned_strings_[hash] = std::string_view(str, N-1);
+        return hash;
+    }
+    
+    std::string_view get(uint32_t hash) const {
+        auto it = interned_strings_.find(hash);
+        return it != interned_strings_.end() ? it->second : "UNKNOWN";
+    }
+};
+
+#define LOG_FORMAT(str) (string_interner.intern(str))
+```
+
+### Zero-Copy Logging
+
+```cpp
+template<size_t BufferSize = 4096>
+class ZeroCopyLogger {
+private:
+    alignas(64) std::array<char, BufferSize> buffer_;
+    std::atomic<size_t> write_pos_{0};
+    
+    struct LogEntry {
+        uint32_t timestamp;
+        LogLevel level;
+        uint16_t message_length;
+        // Variable-length message follows
+    };
+    
+public:
+    template<typename... Args>
+    bool log(LogLevel level, std::string_view format, Args&&... args) {
+        // Pre-calculate required space
+        std::string formatted = std::format(format, args...);
+        size_t required_space = sizeof(LogEntry) + formatted.size();
+        
+        size_t current_pos = write_pos_.load();
+        if (current_pos + required_space > BufferSize) {
+            return false; // Buffer full
+        }
+        
+        // Atomic reservation of space
+        if (!write_pos_.compare_exchange_weak(current_pos, current_pos + required_space)) {
+            return false; // Race condition, try again
+        }
+        
+        // Write entry
+        LogEntry* entry = reinterpret_cast<LogEntry*>(&buffer_[current_pos]);
+        entry->timestamp = get_timestamp();
+        entry->level = level;
+        entry->message_length = formatted.size();
+        
+        std::memcpy(&buffer_[current_pos + sizeof(LogEntry)], 
+                   formatted.data(), formatted.size());
+        
+        return true;
+    }
+    
+    void flush_to_sink(auto& sink) {
+        size_t end_pos = write_pos_.exchange(0);
+        
+        size_t pos = 0;
+        while (pos < end_pos) {
+            const LogEntry* entry = reinterpret_cast<const LogEntry*>(&buffer_[pos]);
+            std::string_view message(reinterpret_cast<const char*>(entry + 1), 
+                                   entry->message_length);
+            
+            sink.write(entry->level, entry->timestamp, message);
+            
+            pos += sizeof(LogEntry) + entry->message_length;
+        }
+    }
+};
+```
+
+## Thread-Safe Patterns
+
+### Lock-Free Single Producer
+
+```cpp
+template<size_t BufferSize>
+class SPSCLogger {
+private:
+    struct alignas(64) Entry {
+        std::atomic<bool> ready{false};
+        LogLevel level;
+        uint32_t timestamp;
+        std::array<char, 256> message;
+        size_t message_length;
+    };
+    
+    alignas(64) std::array<Entry, BufferSize> buffer_;
+    alignas(64) std::atomic<size_t> write_index_{0};
+    alignas(64) std::atomic<size_t> read_index_{0};
+    
+public:
+    // Producer side (logging thread)
+    template<typename... Args>
+    bool log(LogLevel level, std::string_view format, Args&&... args) {
+        size_t current_write = write_index_.load(std::memory_order_relaxed);
+        size_t next_write = (current_write + 1) % BufferSize;
+        
+        if (next_write == read_index_.load(std::memory_order_acquire)) {
+            return false; // Queue full
+        }
+        
+        Entry& entry = buffer_[current_write];
+        entry.level = level;
+        entry.timestamp = get_timestamp();
+        
+        std::string formatted = std::format(format, args...);
+        entry.message_length = std::min(formatted.size(), entry.message.size() - 1);
+        std::memcpy(entry.message.data(), formatted.data(), entry.message_length);
+        entry.message[entry.message_length] = '\0';
+        
+        entry.ready.store(true, std::memory_order_release);
+        write_index_.store(next_write, std::memory_order_relaxed);
+        
+        return true;
+    }
+    
+    // Consumer side (background thread)
+    bool consume_one(auto& sink) {
+        size_t current_read = read_index_.load(std::memory_order_relaxed);
+        Entry& entry = buffer_[current_read];
+        
+        if (!entry.ready.load(std::memory_order_acquire)) {
+            return false; // No new entries
+        }
+        
+        // Process entry
+        std::string_view message(entry.message.data(), entry.message_length);
+        sink.write(entry.level, entry.timestamp, message);
+        
+        entry.ready.store(false, std::memory_order_relaxed);
+        read_index_.store((current_read + 1) % BufferSize, std::memory_order_release);
+        
+        return true;
+    }
+};
+```
+
+## Integration with Modern C++ Features
+
+### Structured Bindings and Logging
+
+```cpp
+template<typename Tuple>
+void log_tuple(const Tuple& t) {
+    std::apply([](const auto&... args) {
+        ((std::cout << args << " "), ...);
+        std::cout << std::endl;
+    }, t);
+}
+
+// Usage
+auto sensor_data = std::make_tuple("temperature", 23.5, "humidity", 45.2);
+log_tuple(sensor_data);
+```
+
+### Concepts for Type Safety
+
+```cpp
+#include <concepts>
+
+template<typename T>
+concept Loggable = requires(T t) {
+    { std::to_string(t) } -> std::convertible_to<std::string>;
+} || requires(std::ostream& os, T t) {
+    { os << t } -> std::same_as<std::ostream&>;
+};
+
+template<Loggable T>
+void safe_log(const T& value) {
+    if constexpr (requires { std::to_string(value); }) {
+        log_string(std::to_string(value));
+    } else {
+        std::ostringstream oss;
+        oss << value;
+        log_string(oss.str());
+    }
+}
+```
+description:
+globs:
+alwaysApply: false
+---
