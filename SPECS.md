@@ -17,8 +17,24 @@ This table provides a central index for all detailed specification documents.
 | `specs/03-ui-ux.md`               | Describes the user interface, screen layouts, interaction flows, and assets. |
 | `specs/04-build-and-environment.md` | Specifies the development environment, build process, and required tooling.  |
 | `specs/05-deployment.md`          | Outlines the firmware flashing process and first-time device setup.        |
+| `specs/06-documentation.md`       | Defines the requirements for user-facing documentation, including the README. |
+| `specs/07-framework-architecture.md` | Specifies the architecture for the general-purpose Display Agent framework. |
+| `specs/08-app-bus-schedule.md`    | Defines the functional and technical requirements for the Bus Schedule Agent. |
 
-## 3. Open Questions / Future Work
+## 3. Implementation Plan
+
+This plan outlines the key phases for transforming Aura into a general-purpose display framework and implementing the first new application.
+
+| Phase | Focus Area                    | Key Deliverables                                                                                                                              | Related Specs                                                              | Status |
+| :---- | :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------- | :----- |
+| 1     | **Core Framework Refactoring**  | - Refactor `weather.ino` into a modular, C++ class-based structure.<br>- Create a `DisplayAgent` abstract base class.<br>- Isolate all weather-specific logic into a `WeatherAgent` class. | `specs/07-framework-architecture.md`                                       | TBD    |
+| 2     | **Remote Configuration**      | - Implement the Agent Manager to fetch and parse the remote JSON config.<br>- Add a "Config URL" field to the WiFiManager setup.<br>- Implement default fallback to the Weather Agent. | `specs/07-framework-architecture.md`                                       | TBD    |
+| 3     | **App Lifecycle Management**  | - Implement the on-device agent switching logic (long-press gesture).<br>- Implement the `setup()`, `loop()`, and `teardown()` lifecycle methods in the Agent Manager and Weather Agent. | `specs/07-framework-architecture.md`                                       | TBD    |
+| 4     | **Bus Schedule App: UI & Data** | - Implement the data fetching logic for the MVG API.<br>- Develop the LVGL user interface for the bus schedule as specified.<br>- Encapsulate all logic into a `BusScheduleAgent` class. | `specs/08-app-bus-schedule.md`                                             | TBD    |
+| 5     | **Integration and Testing**   | - Test fetching a remote config that includes both Weather and Bus agents.<br>- Test switching between the two agents on the device.<br>- Verify all parameters are passed and used correctly. | `specs/07-framework-architecture.md`, `specs/08-app-bus-schedule.md`         | TBD    |
+| 6     | **Documentation Update**      | - Update `README.md` and all relevant specs to reflect the new framework architecture, agent configuration, and the new Bus Schedule app.       | `specs/06-documentation.md`                                                | TBD    |
+
+## 4. Open Questions / Future Work
 
 -   **Asset Management:** The workflow for updating fonts is manual and error-prone. The project would benefit from an automated build process that integrates the `extract_unicode_chars.py` script and the LVGL font converter. Storing assets on SPIFFS instead of compiling them into the binary should also be evaluated for better scalability.
 -   **Configuration Management:** The custom `User_Setup.h` and `lv_conf.h` files must be manually copied into library folders, which is fragile. Using a more robust build system like PlatformIO would allow for project-specific library configurations without modifying the original library source.

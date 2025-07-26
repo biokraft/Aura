@@ -1,46 +1,131 @@
-# Aura
+# Aura: Smart Weather Forecast Display
 
-Aura is a simple weather widget that runs on ESP32-2432S028R ILI9341 devices with a 2.8" screen. These devices are sometimes called a "CYD" or Cheap Yellow Display.
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/seanbaufeld/Aura)](https://github.com/seanbaufeld/Aura/releases/latest)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-This is just the source code for the project. This project includes a case design and assembly instructions. The complete instructions are available
-here: https://makerworld.com/en/models/1382304-aura-smart-weather-forecast-display
+[![C](https://img.shields.io/badge/C-00599C?logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C_(programming_language))
+[![Platform](https://img.shields.io/badge/platform-ESP32-brightgreen.svg)](https://www.espressif.com/en/products/socs/esp32)
+[![Framework](https://img.shields.io/badge/framework-Arduino-00979D.svg)](https://www.arduino.cc/)
+[![UI Library](https://img.shields.io/badge/UI-LVGL-orange.svg)](https://lvgl.io/)
 
-### License
+Aura is a firmware for a DIY smart weather widget that runs on ESP32-2432S028R devices, commonly known as "Cheap Yellow Displays" (CYDs). It features a 2.8" touchscreen display, providing a rich, graphical interface for viewing current weather conditions, 7-day forecasts, and hourly outlooks.
 
-You can use the weather.ino code here under the terms of the GPL 3.0 license.
+This repository contains the complete source code and a detailed guide for building and installing the Aura firmware. For the 3D-printable case design and assembly instructions, please visit the complete project page on [MakerWorld](https://makerworld.com/en/models/1382304-aura-smart-weather-forecast-display).
 
-The icons are not included in that license. See "Thanks" below for details on the icons.
+## Features
 
-### How to compile:
+-   **Current Weather:** Displays temperature, "feels like" temperature, and a large, dynamic weather image.
+-   **7-Day Forecast:** Shows the upcoming week's weather with high/low temperatures and icons.
+-   **Hourly Forecast:** Provides a 7-hour outlook with temperature, precipitation probability, and icons.
+-   **Location Search:** Find and set any location worldwide.
+-   **Multi-Lingual Support:** UI available in English, Spanish, German, and French.
+-   **Touch-Enabled Interface:** Easily navigate between views and settings.
+-   **Configurable Settings:** Adjust brightness, temperature units (°C/°F), and time format (12/24hr).
 
-1. Configure Arduino IDE 
-    1. for "esp32" board with a device type of "ESP32 Dev Module" and
-    1. set "Tools -> Partition Scheme" to "Huge App (3MB No OTA/1MB SPIFFS)"
-1. Install the libraries below in Arduino IDE
-1. Put the source code folders that are in this folder in ~/Documents/Arduino/
-    1. Note the included config files for lvgl and TFT_eSPI need to be dropped in their respective folders
-1. Install and run
+## Table of Contents
 
-### Libraries required to compile:
+-   [Hardware Requirements](#hardware-requirements)
+-   [Installation Guide](#installation-guide)
+    -   [Step 1: Set Up the Arduino IDE](#step-1-set-up-the-arduino-ide)
+    -   [Step 2: Install Libraries](#step-2-install-libraries)
+    -   [Step 3: Configure Libraries](#step-3-configure-libraries)
+    -   [Step 4: Compile and Upload](#step-4-compile-and-upload)
+    -   [Step 5: First-Time Device Setup](#step-5-first-time-device-setup)
+-   [Development](#development)
+    -   [Font Asset Management](#font-asset-management)
+-   [License](#license)
+-   [Credits and Acknowledgements](#credits-and-acknowledgements)
 
-- ArduinoJson 7.4.1
-- HttpClient 2.2.0
-- TFT_eSPI 2.5.43_
-- WifiManager 2.0.17
-- XPT2046_Touchscreen 1.4
-- lvgl 9.2.2
+## Hardware Requirements
 
-### Thanks & Credits
+-   **Device:** ESP32-2432S028R (also known as a "CYD" or Cheap Yellow Display)
+-   **Display:** 2.8" 240x320 ILI9341 TFT Display
+-   **Touch Controller:** XPT2046
+-   **Cable:** Micro-USB cable
 
-- Weather icons from https://github.com/mrdarrengriffin/google-weather-icons/tree/main/v2
-- Thanks to [lvgl](https://lvgl.io/), a great library for UIs on ESP32 devices that made this much easier
-- Thanks to [witnessmenow](https://github.com/witnessmenow/)'s [CYD Github repo](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) for dev board reference information
-- Double thanks to [witnessmenow](https://github.com/witnessmenow/) for the [ESP32 web flashing tutorial](https://github.com/witnessmenow/ESP-Web-Tools-Tutorial)
-- Thanks to [Random Nerd Tutorials](https://randomnerdtutorials.com/) for helpful ESP32 / CYD information, especially with [setting up LVGL](https://randomnerdtutorials.com/esp32-cyd-lvgl-line-chart/)
-- Thanks to these sweet libraries that made this possible:
-	- [ArduinoJson](https://arduinojson.org/)
-	- [HttpClient](https://github.com/amcewen/HttpClient)
-	- [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)
-	- [WifiManager](https://github.com/tzapu/WiFiManager)
-	- [XPT2046_Touchscreen](https://github.com/PaulStoffregen/XPT2046_Touchscreen)
-	- [lvgl](https://lvgl.io/)
+## Installation Guide
+
+This guide walks through the process of setting up your environment and flashing the Aura firmware to your device.
+
+### Step 1: Set Up the Arduino IDE
+
+1.  **Install Arduino IDE:** Download and install the latest version from the [official Arduino website](https://www.arduino.cc/en/software).
+2.  **Install ESP32 Board Support:**
+    -   In the IDE, go to `File` > `Preferences` (`Arduino IDE` > `Settings...` on macOS).
+    -   In the "Additional boards manager URLs" field, enter:
+        ```
+        https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+        ```
+    -   Go to `Tools` > `Board` > `Boards Manager...`.
+    -   Search for "esp32" and install the package by Espressif Systems.
+
+### Step 2: Install Libraries
+
+The project requires several libraries. Install them using the Arduino Library Manager (`Tools` > `Manage Libraries...`).
+
+| Library               | Version |
+| --------------------- | ------- |
+| `ArduinoJson`         | 7.4.1   |
+| `HttpClient`          | 2.2.0   |
+| `TFT_eSPI`            | 2.5.43  |
+| `WifiManager`         | 2.0.17  |
+| `XPT2046_Touchscreen` | 1.4     |
+| `lvgl`                | 9.2.2   |
+
+### Step 3: Configure Libraries
+
+Aura requires specific configurations for `TFT_eSPI` and `lvgl`.
+
+1.  **Download Source Code:** Clone or download this repository as a ZIP file and extract it.
+2.  **Locate Arduino Libraries Folder:** Find your Arduino libraries directory (usually in `~/Documents/Arduino/libraries/`).
+3.  **Copy Configuration Files:**
+    -   Copy the `User_Setup.h` file from this repository's `TFT_eSPI/` folder into your installed `TFT_eSPI` library folder, overwriting the existing file.
+    -   Copy the `lv_conf.h` file from this repository's `lvgl/src/` folder into your installed `lvgl/src/` library folder, overwriting the existing file.
+4.  **Place Sketch Folder:** Copy the `aura/` folder from this repository into your main Arduino sketch folder (e.g., `~/Documents/Arduino/`).
+
+### Step 4: Compile and Upload
+
+1.  **Open Sketch:** Open the `weather.ino` file from the `aura` folder you just copied.
+2.  **Configure Board Settings:**
+    -   `Tools` > `Board`: Select "ESP32 Dev Module".
+    -   `Tools` > `Partition Scheme`: Select "Huge App (3MB No OTA/1MB SPIFFS)".
+3.  **Connect Device:** Connect your ESP32 CYD to your computer.
+4.  **Select Port:** Go to `Tools` > `Port` and choose the correct serial port for your device.
+5.  **Upload:** Click the "Upload" button (right arrow icon). The IDE will compile and flash the firmware.
+
+### Step 5: First-Time Device Setup
+
+After flashing, the device needs to be connected to your Wi-Fi.
+
+1.  **Connect to AP:** The device will start a Wi-Fi access point named **`Aura`**. Use a phone or computer to connect to this network.
+2.  **Configure Wi-Fi:** A captive portal should open automatically. If not, open a browser and go to `http://192.168.4.1`. Select your home Wi-Fi network, enter the password, and save.
+3.  **Done:** The device will restart and connect to your network, then begin displaying the weather. You can now configure your location and other preferences using the on-screen touch menu.
+
+## Development
+
+### Font Asset Management
+
+The UI fonts are pre-compiled into the firmware. If you modify string literals with new special characters (e.g., for translations), you must regenerate the font files.
+
+-   **Tool:** `aura/extract_unicode_chars.py`
+-   **Usage:** Run this script to get a list of all non-ASCII characters needed for the font.
+    ```bash
+    python3 aura/extract_unicode_chars.py aura/weather.ino
+    ```
+-   **Conversion:** Copy the output character list into the [LVGL Font Converter](https://lvgl.io/tools/fontconverter) to generate new C files. Replace the old font files in the `aura/` directory with the new ones.
+
+## License
+
+The `weather.ino` application source code is licensed under the [GPL-3.0 License](./LICENSE).
+
+The weather icons and images are derived from the [Google Weather Icons project by @mrdarrengriffin](https://github.com/mrdarrengriffin/google-weather-icons/tree/main/v2) and are subject to their original license terms.
+
+## Credits and Acknowledgements
+
+This project would not have been possible without the incredible work of the open-source community.
+
+-   **UI Framework:** [LVGL](https://lvgl.io/)
+-   **Libraries:** `ArduinoJson`, `HttpClient`, `TFT_eSPI`, `WifiManager`, `XPT2046_Touchscreen`
+-   **Inspiration & Resources:**
+    -   [witnessmenow's CYD GitHub Repo](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)
+    -   [Random Nerd Tutorials](https://randomnerdtutorials.com/)
