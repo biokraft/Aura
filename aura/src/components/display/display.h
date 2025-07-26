@@ -33,7 +33,14 @@ private:
     TFT_eSPI tft;
     SPIClass touchscreenSPI;
     XPT2046_Touchscreen touchscreen;
-    uint16_t draw_buf[DRAW_BUF_SIZE / 2];
+    
+    // Optimized buffer configuration for ESP32 performance
+    // Use smaller buffers in fast internal SRAM (30 lines worth)
+    static constexpr int BUFFER_LINES = 30;
+    static constexpr int BUFFER_SIZE = SCREEN_WIDTH * BUFFER_LINES;
+    static lv_color_t draw_buf_1[BUFFER_SIZE] DMA_ATTR;
+    static lv_color_t draw_buf_2[BUFFER_SIZE] DMA_ATTR;  // Double buffer for better performance
+    
     lv_display_t* display;
     lv_indev_t* indev;
     

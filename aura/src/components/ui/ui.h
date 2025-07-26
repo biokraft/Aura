@@ -19,6 +19,7 @@ public:
     void createWiFiConfigScreen();
     void createSettingsWindow();
     void createLocationWindow();
+    void cleanupMainScreen();
     
     // UI updates
     void updateWeatherData(const JsonDocument& weatherData);
@@ -26,6 +27,7 @@ public:
     void updateTemperature(float temp, float feelsLike);
     void updateForecast(const JsonArray& daily, const JsonArray& hourly);
     void updateLocation(const String& locationName);
+    void updateBackground(int wmo_code, int is_day);
     
     // Event handlers
     static void settingsEventHandler(lv_event_t* e);
@@ -74,9 +76,13 @@ private:
     // Helper methods
     void createDailyForecastBox();
     void createHourlyForecastBox();
-    void updateBackground(int wmo_code, int is_day);
     String formatTime(int hour);
     String formatTemperature(float temp);
+    
+    // UI creation helper methods
+    bool createTemperatureDisplay();
+    bool createClockDisplay();
+    bool createWeatherIcon();
     
     // Static instance for callbacks
     static UI* instance;

@@ -220,13 +220,26 @@ void setup() {
   // Now create the main screen and populate with data
   ui.createMainScreen();
 
-  // Set proper data to make the display look correct
+  // Initialize weather data with default values
+  Serial.println("Setting up initial weather display...");
+  
+  // Set initial data to make the display look correct
   ui.updateTemperature(22.0, 24.0); // 22°C, feels like 24°C
   ui.updateLocation("London");
-
+  ui.updateClock(); // Update clock immediately
+  
   // Force immediate redraw
   lv_refr_now(NULL);
-  Serial.println("Main UI displayed with data");
+  Serial.println("Main UI displayed with initial data");
+
+  // Trigger first weather update
+  Serial.println("Triggering initial weather data fetch...");
+  if (weather.fetchWeatherData()) {
+    Serial.println("Initial weather data fetched successfully");
+    updateUIWithWeatherData();
+  } else {
+    Serial.println("Initial weather fetch failed, using placeholder data");
+  }
 
   Serial.println("Aura Weather Display Ready!");
 }
@@ -248,12 +261,12 @@ void loop() {
 
   // Update weather every 5 minutes
   if (current_time - last_weather_update >= 300000 || last_weather_update == 0) {
+    Serial.println("Updating weather data...");
     if (weather.fetchWeatherData()) {
       Serial.println("Weather data updated successfully");
-      // You could update UI with weather data here
-      // ui.updateWeatherData(weather.getCurrentWeather());
+      updateUIWithWeatherData(); // Use the new integration function
     } else {
-      Serial.println("Failed to fetch weather data");
+      Serial.println("Failed to fetch weather data - keeping current display");
     }
     last_weather_update = current_time;
   }
@@ -266,6 +279,38 @@ void loop() {
 }
 
 // Helper function implementations
+void updateUIWithWeatherData() {
+  // Get current weather data from weather component
+  const WeatherData& weatherData = weather.getCurrentWeather();
+  
+  if (weather.isDataValid()) {
+    // Update current temperature
+    ui.updateTemperature(weatherData.current_temp, weatherData.feels_like);
+    Serial.printf("UI updated with temperature: %.1f°C (feels like %.1f°C)\n", 
+                  weatherData.current_temp, weatherData.feels_like);
+    
+    // Update weather background
+    ui.updateBackground(weatherData.weather_code, weatherData.is_day ? 1 : 0);
+    Serial.printf("UI updated with weather code: %d (day: %d)\n", 
+                  weatherData.weather_code, weatherData.is_day ? 1 : 0);
+    
+    // Update location
+    if (!weatherData.location_name.isEmpty()) {
+      ui.updateLocation(weatherData.location_name);
+      Serial.printf("UI updated with location: %s\n", weatherData.location_name.c_str());
+    } else if (!location.isEmpty()) {
+      ui.updateLocation(location);
+      Serial.printf("UI updated with configured location: %s\n", location.c_str());
+    }
+    
+    // Note: Forecast data integration would require extending the UI to handle
+    // the WeatherData arrays (daily_high, daily_low, hourly_temps, etc.)
+    Serial.println("Weather data integration completed successfully");
+  } else {
+    Serial.println("Weather data is not valid, keeping current UI state");
+  }
+}
+
 const LocalizedStrings *get_strings() {
   switch (current_language) {
     case LANG_ES: return &es_strings;
