@@ -194,21 +194,15 @@ void logging_init_time(void) {
         return;
     }
     
-    // Initialize SNTP
-    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
-    esp_sntp_setservername(0, default_ntp_servers[0]);
-    esp_sntp_setservername(1, default_ntp_servers[1]);
-    esp_sntp_setservername(2, default_ntp_servers[2]);
-    esp_sntp_init();
-    
-    // Set default timezone to UTC
+    // Set default timezone to UTC (safe to do without network)
     setenv("TZ", "UTC", 1);
     tzset();
     
     time_initialized = true;
     
-    // Note: Don't use LOG_MAIN_I here to avoid infinite recursion during initialization
-    ESP_LOGI(TAG_MAIN, "Time system initialized");
+    // Note: SNTP initialization is deferred until WiFi is available
+    // Call logging_enable_sntp() after WiFi connection is established
+    ESP_LOGI(TAG_MAIN, "Time system initialized (SNTP deferred until WiFi ready)");
 }
 
 void logging_set_timezone(const char* timezone) {
@@ -275,14 +269,23 @@ void logging_enable_sntp(const char* ntp_server) {
         return;
     }
     
-    // Stop SNTP if running
-    esp_sntp_stop();
+    // Check if SNTP was already initialized
+    static bool sntp_initialized = false;
     
-    // Set new server
+    if (sntp_initialized) {
+        // Stop SNTP if running
+        esp_sntp_stop();
+    }
+    
+    // Initialize/configure SNTP
+    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, ntp_server);
+    esp_sntp_setservername(1, default_ntp_servers[1]);
+    esp_sntp_setservername(2, default_ntp_servers[2]);
     
-    // Restart SNTP
+    // Start SNTP (safe to call after WiFi is connected)
     esp_sntp_init();
+    sntp_initialized = true;
     
-    LOG_MAIN_I("SNTP server set to: %s", ntp_server);
+    LOG_MAIN_I("SNTP initialized with server: %s", ntp_server);
 } 

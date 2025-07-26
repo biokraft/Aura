@@ -64,6 +64,14 @@ private:
     // Settings storage
     Preferences prefs;
     
+    // Location and settings
+    char latitude[16];
+    char longitude[16];
+    String location;
+    bool use_fahrenheit;
+    bool use_24_hour;
+    Language current_language;
+    
     // Helper methods
     bool parseWeatherResponse(const String& response);
     String buildWeatherApiUrl();
