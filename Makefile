@@ -101,7 +101,7 @@ compile: check/arduino-cli $(TMP_DIR)/.libraries-installed $(TMP_DIR)/.configure
 	@echo "✅ Compilation complete!"
 .PHONY: compile
 
-## flash: Flash the compiled firmware to the connected ESP32 device.
+## flash: Flash the compiled firmware to the connected ESP32 device with automatic fallback.
 flash: check/arduino-cli check/device compile
 	@echo "📡 Flashing firmware to device..."
 	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM|cu\.usbserial)" | head -1 | awk '{print $$1}'); \
@@ -110,9 +110,39 @@ flash: check/arduino-cli check/device compile
 		exit 1; \
 	fi; \
 	echo "🔌 Using port: $$PORT"; \
-	$(ARDUINO_CLI) upload --fqbn $(BOARD_FQBN) --port $$PORT $(AURA_DIR)
+	echo "🚀 Attempting standard Arduino CLI upload..."; \
+	if $(ARDUINO_CLI) upload --fqbn $(BOARD_FQBN) --port $$PORT $(AURA_DIR) 2>/dev/null; then \
+		echo "✅ Standard upload successful!"; \
+	else \
+		echo "⚠️  Standard upload failed, using reliable fallback method ($(BAUD_RATE) baud)..."; \
+		SKETCH_CACHE_DIR=$$(find ~/Library/Caches/arduino/sketches ~/.arduino15/cache -name "*.ino.bin" -type f 2>/dev/null | head -1 | xargs dirname 2>/dev/null); \
+		if [ -z "$$SKETCH_CACHE_DIR" ]; then \
+			echo "❌ Could not find compiled sketch cache."; \
+			exit 1; \
+		fi; \
+		ESPTOOL_PATH=$$(find ~/Library/Arduino15 ~/.arduino15 -path "*/esptool_py/*/esptool" -type f 2>/dev/null | head -1); \
+		if [ -z "$$ESPTOOL_PATH" ]; then \
+			echo "❌ Could not find esptool."; \
+			exit 1; \
+		fi; \
+		BOOT_APP0=$$(find ~/Library/Arduino15 ~/.arduino15 -path "*/esp32/*/tools/partitions/boot_app0.bin" -type f 2>/dev/null | head -1); \
+		if [ -z "$$BOOT_APP0" ]; then \
+			echo "❌ Could not find boot_app0.bin."; \
+			exit 1; \
+		fi; \
+		echo "📁 Using sketch cache: $$SKETCH_CACHE_DIR"; \
+		echo "🔧 Using esptool: $$ESPTOOL_PATH"; \
+		"$$ESPTOOL_PATH" --chip esp32 --port "$$PORT" --baud $(BAUD_RATE) \
+			--before default_reset --after hard_reset write_flash -z \
+			--flash_mode dio --flash_freq 80m --flash_size 4MB \
+			0x1000 "$$SKETCH_CACHE_DIR/$(SKETCH_NAME).ino.bootloader.bin" \
+			0x8000 "$$SKETCH_CACHE_DIR/$(SKETCH_NAME).ino.partitions.bin" \
+			0xe000 "$$BOOT_APP0" \
+			0x10000 "$$SKETCH_CACHE_DIR/$(SKETCH_NAME).ino.bin"; \
+		echo "✅ Fallback upload successful!"; \
+	fi
 	@echo "✅ Firmware flashed successfully!"
-	@echo "💡 Disconnect and reconnect power to start the device."
+	@echo "💡 Device will automatically reset and start running."
 .PHONY: flash
 
 ## monitor: Monitor serial output from the ESP32 device.

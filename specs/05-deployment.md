@@ -1,5 +1,7 @@
 # Deployment Specification
 
+[⬅️ Back to Specifications](../SPECS.md)
+
 ## 1. Purpose
 
 This document outlines the procedure for compiling and deploying the Aura firmware to a compatible ESP32 device, as well as the initial on-device configuration.

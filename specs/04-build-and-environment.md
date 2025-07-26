@@ -1,5 +1,7 @@
 # Build and Environment Specification
 
+[⬅️ Back to Specifications](../SPECS.md)
+
 ## 1. Purpose
 
 This document specifies the development environment, compilation process, and tooling required to build the Aura firmware.

@@ -1,5 +1,7 @@
 # Documentation Specification
 
+[⬅️ Back to Specifications](../SPECS.md)
+
 ## 1. Purpose
 
 This document specifies the requirements for user-facing documentation for the Aura project. The primary goal is to provide clear, comprehensive, and accessible information for end-users and developers.

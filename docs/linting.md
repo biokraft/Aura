@@ -1,265 +1,124 @@
-# Linting and Code Quality Setup
+# 🧹 Linting and Code Quality
 
-This document describes the linting and code quality tools configured for the Aura project.
+This document outlines the tools and workflows for maintaining code quality in the Aura project. A consistent code style and automated checks help ensure the code is readable, maintainable, and free of common bugs.
 
-## Overview
+[⬅️ Back to Home](../README.md)
 
-The project uses two complementary linting tools:
+## Table of Contents
 
-1. **Clang-Tidy**: Static analysis for C/C++ code to detect bugs, performance issues, and style violations
-2. **arduino-lint**: Arduino ecosystem-specific linting for project structure and conventions
+- [Quick Start](#-quick-start)
+- [Available Tools](#-available-tools)
+  - [Clang-Tidy](#clang-tidy)
+  - [Clang-Format](#clang-format)
+  - [arduino-lint](#arduino-lint)
+- [Makefile Commands](#-makefile-commands)
+- [IDE Integration](#-ide-integration)
+- [Troubleshooting](#-troubleshooting)
 
-## Quick Start
+## 🚀 Quick Start
+
+The fastest way to manage code quality is through the provided `Makefile` targets.
 
 ### 1. Install Tools
 
-```bash
-# Install all required tools automatically
-make setup
+The `setup` command installs all necessary linting and formatting tools.
 
-# Or check which tools are already available
-make check-tools
+```bash
+make setup
 ```
 
-### 2. Run Linting
+### 2. Run Linters and Formatters
+
+Use the `lint` and `format` commands to check and fix the entire codebase.
 
 ```bash
-# Run all linters
+# Run all linters (Clang-Tidy + arduino-lint)
 make lint
 
-# Run specific linters
-make lint/clang-tidy
-make lint/arduino
+# Automatically format all C/C++ source files
+make format
 ```
 
-### 3. Format Code
+For more granular control, you can auto-fix many common issues found by `clang-tidy` and then format the code:
 
 ```bash
-# Format all source files
-make format
-
-# Check formatting without modifying files
-make format/check
-
-# Auto-fix issues and format
 make format/fix
 ```
 
-## Tool Installation
+## 🛠️ Available Tools
 
-### Clang-Tidy and Clang-Format
+The project leverages a combination of tools to enforce code standards.
 
-**macOS (Homebrew):**
-```bash
-brew install llvm
-```
+### Clang-Tidy
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get update
-sudo apt-get install -y clang-tidy clang-format
-```
+A powerful static analysis tool for C/C++ code. It detects a wide range of issues, including:
+- Potential bugs and logic errors
+- Performance inefficiencies
+- Style violations
+- Portability problems
 
-**RHEL/CentOS/Fedora:**
-```bash
-sudo yum install -y clang-tools-extra
-# or
-sudo dnf install -y clang-tools-extra
-```
+Configuration is managed in the [`.clang-tidy`](../.clang-tidy) file, which is tailored for embedded C development.
+
+### Clang-Format
+
+A tool to automatically format C/C++ code according to a defined style. This ensures a consistent look and feel across the entire codebase, making it easier to read and review.
+
+The formatting rules are defined in the [`.clang-format`](../.clang-format) file, which is based on Arduino conventions with some modifications.
 
 ### arduino-lint
 
-**With Go installed:**
-```bash
-go install github.com/arduino/arduino-lint@latest
-```
+An Arduino-specific linter that checks for common issues related to the Arduino ecosystem, such as:
+- Correct project structure
+- Presence of required metadata files (`library.properties`)
+- Adherence to Arduino library conventions
 
-**Download binary:**
-Visit [arduino-lint releases](https://github.com/arduino/arduino-lint/releases) and download the appropriate binary for your platform.
+## 📦 Makefile Commands
 
-## Configuration Files
+The `Makefile` provides a convenient interface for all quality-related tasks.
 
-### `.clang-tidy`
+| Command             | Description                                                              |
+| ------------------- | ------------------------------------------------------------------------ |
+| `make setup`        | Installs all required linting and formatting tools.                      |
+| `make check-tools`  | Verifies that all required tools are installed and available in `PATH`.  |
+| `make lint`         | Runs all available linters (`clang-tidy` and `arduino-lint`).            |
+| `make lint/clang-tidy`| Runs only the Clang-Tidy static analyzer.                                |
+| `make lint/arduino` | Runs only the arduino-lint checker.                                      |
+| `make format`       | Automatically formats all C/C++ source files.                            |
+| `make format/check` | Checks formatting without modifying files (ideal for CI).                |
+| `make format/fix`   | Attempts to automatically fix issues found by `clang-tidy` and formats.  |
+| `make analyze`      | Generates detailed analysis reports in the `build/` directory.           |
+| `make ci/lint`      | Runs a stricter version of linting suitable for CI/CD pipelines.         |
 
-The Clang-Tidy configuration is optimized for embedded C development:
+## 💻 IDE Integration
 
-- **Enabled checks**: `bugprone-*`, `cert-*`, `clang-analyzer-*`, `performance-*`, `portability-*`, `readability-*`, `misc-*`
-- **Disabled checks**: Overly strict checks that don't apply well to embedded development
-- **Header filter**: Only analyzes files in the `aura/` directory
+For a seamless development experience, integrate the tools directly into your editor.
 
-Key disabled checks:
-- `readability-magic-numbers`: Common in embedded code for hardware constants
-- `readability-function-cognitive-complexity`: Embedded code often has complex hardware interaction
-- `cert-err34-c`: Allows ignoring return values from certain functions
+### Visual Studio Code
 
-### `.clang-format`
+1.  **Install Extensions:**
+    -   [C/C++ by Microsoft](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
+    -   [clangd by LLVM](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd)
 
-The Clang-Format configuration follows Arduino conventions:
+2.  **Configure Settings:**
+    Create or update `.vscode/settings.json` in your project root:
+    ```json
+    {
+      "editor.formatOnSave": true,
+      "[cpp]": {
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+      },
+      "clangd.arguments": [
+        "--compile-commands-dir=build"
+      ]
+    }
+    ```
 
-- **Base style**: LLVM with modifications
-- **Indentation**: 2 spaces (no tabs)
-- **Column limit**: 100 characters
-- **Brace style**: Attach (K&R style)
-- **Pointer alignment**: Right (`int *ptr`)
+### CLion
 
-## Available Make Targets
+CLion offers native support for both Clang-Tidy and Clang-Format.
+-   Enable them in **Settings/Preferences** → **Editor** → **Code Style** → **C/C++**.
+-   Configure Clang-Tidy checks in **Settings/Preferences** → **Editor** → **Inspections**.
 
-### Linting
-- `make lint` - Run all linters
-- `make lint/clang-tidy` - Run only Clang-Tidy static analysis
-- `make lint/arduino` - Run only arduino-lint structure checks
+## 🤔 Troubleshooting
 
-### Formatting
-- `make format` - Format all source files using clang-format
-- `make format/check` - Check if files are properly formatted (CI-friendly)
-- `make format/fix` - Auto-fix Clang-Tidy issues and format code
-
-### Analysis and Reports
-- `make analyze` - Generate detailed analysis reports in `build/`
-  - `build/lint-report.txt` - Combined text report
-  - `build/clang-tidy-report.html` - HTML report (requires `pip install codereport`)
-
-### CI/CD
-- `make ci/lint` - Run linting with stricter settings for CI environments
-
-### Maintenance
-- `make clean` - Remove generated files and temporary directories
-- `make check-tools` - Verify all required tools are installed
-- `make setup` - Install missing tools
-
-## Integration with Development Workflow
-
-### Pre-commit Hook
-
-Add this to `.git/hooks/pre-commit` to run linting before commits:
-
-```bash
-#!/bin/bash
-set -e
-
-echo "Running pre-commit linting..."
-make format/check
-make lint
-echo "✅ Pre-commit checks passed!"
-```
-
-### IDE Integration
-
-#### Visual Studio Code
-
-Install the following extensions:
-- [C/C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
-- [clangd](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd)
-
-Add to `.vscode/settings.json`:
-```json
-{
-  "clang-format.executable": "clang-format",
-  "editor.formatOnSave": true,
-  "C_Cpp.codeAnalysis.clangTidy.enabled": true,
-  "C_Cpp.codeAnalysis.clangTidy.path": "clang-tidy"
-}
-```
-
-#### CLion
-
-CLion has built-in support for Clang-Tidy and Clang-Format. Enable them in:
-- **Settings > Tools > Clang-Tidy**
-- **Settings > Editor > Code Style > C/C++**
-
-## Troubleshooting
-
-### "Command not found" Errors
-
-If you get "command not found" for the linting tools:
-
-1. Run `make check-tools` to see what's missing
-2. Run `make setup` to install tools automatically
-3. Ensure the tools are in your PATH
-
-### macOS Path Issues
-
-If using Homebrew on macOS and tools aren't found:
-
-```bash
-# Add LLVM to PATH
-export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-# or for Intel Macs:
-export PATH="/usr/local/opt/llvm/bin:$PATH"
-```
-
-### Too Many Warnings
-
-If clang-tidy reports too many issues:
-
-1. Start with `make format/fix` to auto-fix many issues
-2. Temporarily disable strict checks by editing `.clang-tidy`
-3. Use `make analyze` to generate reports and prioritize fixes
-
-### Arduino-Lint Failures
-
-Common arduino-lint issues:
-
-- **Missing library.properties**: Required for Arduino libraries
-- **Invalid sketch structure**: Ensure `.ino` files are in correctly named directories
-- **Missing README**: Arduino projects should have documentation
-
-## Customization
-
-### Adding New Clang-Tidy Checks
-
-Edit `.clang-tidy` to add or remove checks:
-
-```yaml
-Checks: >
-  -*,
-  bugprone-*,
-  your-new-check-category-*,
-  -specific-check-to-disable
-```
-
-### Modifying Code Style
-
-Edit `.clang-format` to change formatting rules:
-
-```yaml
-# Example: Change indentation to 4 spaces
-IndentWidth: 4
-
-# Example: Change brace style
-BreakBeforeBraces: Allman
-```
-
-### CI/CD Configuration
-
-For GitHub Actions, add to `.github/workflows/lint.yml`:
-
-```yaml
-name: Lint
-
-on: [push, pull_request]
-
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install tools
-        run: make setup
-      - name: Run linting
-        run: make ci/lint
-```
-
-## Performance Notes
-
-- **First run**: May take longer as compilation database is generated
-- **Incremental runs**: Only re-analyzes changed files
-- **Large files**: Consider splitting very large files for better analysis performance
-- **Parallel execution**: Use `make -j4 lint` for faster execution on multi-core systems
-
-## References
-
-- [Clang-Tidy Documentation](https://clang.llvm.org/extra/clang-tidy/)
-- [Clang-Format Style Options](https://clang.llvm.org/docs/ClangFormatStyleOptions.html)
-- [arduino-lint Documentation](https://arduino.github.io/arduino-lint/)
-- [CERT C Coding Standard](https://wiki.sei.cmu.edu/confluence/display/c/SEI+CERT+C+Coding+Standard) 
+If you encounter issues with the linting tools, refer to the main [**Troubleshooting Guide**](./TROUBLESHOOTING.md) for solutions to common problems like "command not found" errors or permission issues. 

@@ -1,5 +1,7 @@
 # Framework Architecture Specification
 
+[⬅️ Back to Specifications](../SPECS.md)
+
 ## 1. Purpose
 
 This document specifies the architecture for transforming the single-purpose Aura weather widget into a general-purpose, remotely configurable display framework. This framework will support multiple "Display Agents" (mini-apps) that can be switched on the device.

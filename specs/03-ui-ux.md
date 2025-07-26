@@ -1,5 +1,7 @@
 # UI/UX Specification
 
+[⬅️ Back to Specifications](../SPECS.md)
+
 ## 1. Purpose
 
 This document describes the user interface (UI), user experience (UX), and graphical assets for the Aura weather widget.

@@ -1,5 +1,7 @@
 # Hardware Specification
 
+[⬅️ Back to Specifications](../SPECS.md)
+
 ## 1. Purpose
 
 This document specifies the hardware components and their configurations for the Aura weather widget.

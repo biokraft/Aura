@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <TFT_eSPI.h>
+#include <WiFi.h>
 #include <WiFiManager.h>
 #include <XPT2046_Touchscreen.h>
 #include <lvgl.h>
@@ -23,6 +24,7 @@
 #define LONGITUDE_DEFAULT "-0.1278"
 #define LOCATION_DEFAULT "London"
 #define DEFAULT_CAPTIVE_SSID "Aura"
+#define DEVICE_HOSTNAME "AuraSmartDevice"
 #define UPDATE_INTERVAL 600000UL // 10 minutes
 
 LV_FONT_DECLARE(lv_font_montserrat_latin_12);
@@ -391,6 +393,28 @@ static void settings_event_handler(lv_event_t *e);
 const lv_img_dsc_t *choose_image(int wmo_code, int is_day);
 const lv_img_dsc_t *choose_icon(int wmo_code, int is_day);
 
+// Generate unique device hostname based on MAC address
+String generateUniqueHostname() {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  
+  // Create a simple hash from MAC address
+  uint32_t hash = 0;
+  for (int i = 0; i < 6; i++) {
+    hash = hash * 31 + mac[i];
+  }
+  
+  // Convert to 5-character alphanumeric string
+  String hashStr = "";
+  const char chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (int i = 0; i < 5; i++) {
+    hashStr += chars[hash % 36];
+    hash /= 36;
+  }
+  
+  return String(DEVICE_HOSTNAME) + "-" + hashStr;
+}
+
 
 int day_of_week(int y, int m, int d) {
   static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
@@ -536,6 +560,11 @@ void setup() {
   current_language = (Language) prefs.getUInt("language", LANG_EN);
   analogWrite(LCD_BACKLIGHT_PIN, brightness);
 
+  // Set unique device hostname for network identification
+  String uniqueHostname = generateUniqueHostname();
+  WiFi.setHostname(uniqueHostname.c_str());
+  Serial.println("Device hostname: " + uniqueHostname);
+  
   // Check for Wi-Fi config and request it if not available
   WiFiManager wm;
   wm.setAPCallback(apModeCallback);
@@ -557,6 +586,9 @@ void flush_wifi_splashscreen(uint32_t ms = 200) {
 }
 
 void apModeCallback(WiFiManager *mgr) {
+  // Ensure unique hostname is set even in AP mode
+  String uniqueHostname = generateUniqueHostname();
+  WiFi.setHostname(uniqueHostname.c_str());
   wifi_splash_screen();
   flush_wifi_splashscreen();
 }
@@ -597,7 +629,6 @@ void create_ui() {
   lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0xa6cdec), LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-
   // Trigger settings screen on touch
   lv_obj_add_event_cb(scr, screen_event_cb, LV_EVENT_CLICKED, NULL);
 
@@ -836,6 +867,9 @@ static void reset_wifi_event_handler(lv_event_t *e) {
 static void reset_confirm_yes_cb(lv_event_t *e) {
   lv_obj_t *mbox = (lv_obj_t *) lv_event_get_user_data(e);
   Serial.println("Clearing Wi-Fi creds and rebooting");
+  // Set unique hostname before resetting WiFi (will be applied on restart)
+  String uniqueHostname = generateUniqueHostname();
+  WiFi.setHostname(uniqueHostname.c_str());
   WiFiManager wm;
   wm.resetSettings();
   delay(100);

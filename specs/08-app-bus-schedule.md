@@ -1,4 +1,6 @@
-# App Specification: Bus Schedule Agent
+# App Bus Schedule Specification
+
+[⬅️ Back to Specifications](../SPECS.md)
 
 ## 1. Purpose
 

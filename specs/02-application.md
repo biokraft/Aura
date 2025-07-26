@@ -1,5 +1,7 @@
 # Application Specification
 
+[⬅️ Back to Specifications](../SPECS.md)
+
 ## 1. Purpose
 
 This document details the software architecture, dependencies, and core logic of the Aura weather widget firmware.
