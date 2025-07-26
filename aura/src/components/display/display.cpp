@@ -5,7 +5,9 @@ Display* Display::instance = nullptr;
 
 Display::Display() : 
     touchscreenSPI(VSPI),
-    touchscreen(XPT2046_CS, XPT2046_IRQ) {
+    touchscreen(XPT2046_CS, XPT2046_IRQ),
+    display(nullptr),
+    indev(nullptr) {
     instance = this;
 }
 
@@ -41,40 +43,34 @@ void Display::setupLVGL() {
     // Initialize LVGL
     lv_init();
     
-    // Setup display buffer
-    static lv_disp_draw_buf_t disp_buf;
-    lv_disp_draw_buf_init(&disp_buf, draw_buf, NULL, DRAW_BUF_SIZE / 4);
+    // Create display using LVGL 9.x API
+    display = lv_display_create(SCREEN_WIDTH, SCREEN_HEIGHT);
     
-    // Setup display driver
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = SCREEN_WIDTH;
-    disp_drv.ver_res = SCREEN_HEIGHT;
-    disp_drv.flush_cb = disp_flush_cb;
-    disp_drv.draw_buf = &disp_buf;
-    lv_disp_drv_register(&disp_drv);
+    // Setup display buffers using new API
+    lv_display_set_buffers(display, draw_buf, NULL, DRAW_BUF_SIZE * sizeof(uint32_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
     
-    // Setup input device driver (touchscreen)
-    static lv_indev_drv_t indev_drv;
-    lv_indev_drv_init(&indev_drv);
-    indev_drv.type = LV_INDEV_TYPE_POINTER;
-    indev_drv.read_cb = touch_read_cb;
-    lv_indev_drv_register(&indev_drv);
+    // Set display flush callback
+    lv_display_set_flush_cb(display, disp_flush_cb);
+    
+    // Setup input device (touchscreen) using new API
+    indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(indev, touch_read_cb);
 }
 
-void Display::flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
+void Display::flush(const lv_area_t *area, uint8_t *color_p) {
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
     
     tft.startWrite();
     tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.writePixels((lgfx::rgb565_t *)&color_p->full, w * h);
+    tft.pushColors((uint16_t*)color_p, w * h, true);
     tft.endWrite();
     
-    lv_disp_flush_ready(disp_drv);
+    lv_display_flush_ready(display);
 }
 
-void Display::touchRead(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
+void Display::touchRead(lv_indev_data_t *data) {
     if (touchscreen.touched()) {
         TS_Point p = touchscreen.getPoint();
         
@@ -95,18 +91,18 @@ void Display::setBacklight(uint8_t brightness) {
 }
 
 void Display::task() {
-    lv_task_handler();
+    lv_timer_handler();
 }
 
 // Static callback functions
-void Display::disp_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
+void Display::disp_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p) {
     if (instance) {
-        instance->flush(disp_drv, area, color_p);
+        instance->flush(area, color_p);
     }
 }
 
-void Display::touch_read_cb(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
+void Display::touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     if (instance) {
-        instance->touchRead(indev_drv, data);
+        instance->touchRead(data);
     }
 } 

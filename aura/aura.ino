@@ -347,7 +347,7 @@ void loop() {
 }
 
 // Weather icon and image selection functions
-const lv_img_dsc_t *choose_image(int wmo_code, int is_day) {
+const lv_image_dsc_t *choose_image(int wmo_code, int is_day) {
   switch (wmo_code) {
     case 0:
       return is_day ? &image_sunny : &image_clear_night;
@@ -401,7 +401,7 @@ const lv_img_dsc_t *choose_image(int wmo_code, int is_day) {
   }
 }
 
-const lv_img_dsc_t *choose_icon(int wmo_code, int is_day) {
+const lv_image_dsc_t *choose_icon(int wmo_code, int is_day) {
   switch (wmo_code) {
     case 0:
       return is_day ? &icon_sunny : &icon_clear_night;

@@ -43,7 +43,7 @@ void UI::createMainScreen() {
     lv_obj_align_to(lbl_today_feels_like, lbl_today_temp, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
     
     // Today's weather icon
-    img_today_icon = lv_img_create(main_screen);
+    img_today_icon = lv_image_create(main_screen);
     lv_obj_align(img_today_icon, LV_ALIGN_TOP_RIGHT, -10, 10);
     
     // Clock label
@@ -57,7 +57,7 @@ void UI::createMainScreen() {
     createHourlyForecastBox();
     
     // Load the screen
-    lv_scr_load(main_screen);
+    lv_screen_load(main_screen);
 }
 
 void UI::createDailyForecastBox() {
@@ -79,7 +79,7 @@ void UI::createDailyForecastBox() {
         lv_obj_set_pos(lbl_daily_day[i], x_offset, 5);
         
         // Weather icon
-        img_daily[i] = lv_img_create(box_daily);
+        img_daily[i] = lv_image_create(box_daily);
         lv_obj_set_pos(img_daily[i], x_offset, 20);
         
         // High temperature
@@ -115,7 +115,7 @@ void UI::createHourlyForecastBox() {
         lv_obj_set_pos(lbl_hourly[i], x_offset, 5);
         
         // Weather icon
-        img_hourly[i] = lv_img_create(box_hourly);
+        img_hourly[i] = lv_image_create(box_hourly);
         lv_obj_set_pos(img_hourly[i], x_offset, 20);
         
         // Temperature
@@ -188,9 +188,9 @@ void UI::updateLocation(const String& locationName) {
 
 void UI::updateBackground(int wmo_code, int is_day) {
     if (main_screen) {
-        const lv_img_dsc_t* bg_image = choose_image(wmo_code, is_day);
+        const lv_image_dsc_t* bg_image = choose_image(wmo_code, is_day);
         if (bg_image) {
-            lv_obj_set_style_bg_img_src(main_screen, bg_image, LV_PART_MAIN);
+            lv_obj_set_style_bg_image_src(main_screen, bg_image, LV_PART_MAIN);
         }
     }
 }

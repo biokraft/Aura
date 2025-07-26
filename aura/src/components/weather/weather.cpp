@@ -166,7 +166,7 @@ bool Weather::parseWeatherResponse(const String& response) {
             currentWeather.hourly_temps[i] = temps[i];
             currentWeather.hourly_codes[i] = codes[i];
             currentWeather.hourly_precipitation[i] = precipitation[i];
-            currentWeather.hourly_times[i] = times[i];
+            currentWeather.hourly_times[i] = times[i].as<String>();
         }
     }
     

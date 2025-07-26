@@ -17,8 +17,8 @@ public:
     void setupLVGL();
     
     // Display management
-    void flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p);
-    void touchRead(lv_indev_drv_t *indev_drv, lv_indev_data_t *data);
+    void flush(const lv_area_t *area, uint8_t *color_p);
+    void touchRead(lv_indev_data_t *data);
     void setBacklight(uint8_t brightness);
     
     // Task handling
@@ -27,16 +27,19 @@ public:
     // Getters
     TFT_eSPI& getTFT() { return tft; }
     XPT2046_Touchscreen& getTouchscreen() { return touchscreen; }
+    lv_display_t* getDisplay() { return display; }
     
 private:
     TFT_eSPI tft;
     SPIClass touchscreenSPI;
     XPT2046_Touchscreen touchscreen;
     uint32_t draw_buf[DRAW_BUF_SIZE / 4];
+    lv_display_t* display;
+    lv_indev_t* indev;
     
     // Static callback functions for LVGL
-    static void disp_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p);
-    static void touch_read_cb(lv_indev_drv_t *indev_drv, lv_indev_data_t *data);
+    static void disp_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p);
+    static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data);
     
     // Static instance pointer for callbacks
     static Display* instance;
