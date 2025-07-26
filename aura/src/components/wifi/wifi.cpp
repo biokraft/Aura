@@ -1,51 +1,52 @@
 #include "wifi.h"
+#include "../logging/logging.h"
 #include <Arduino.h>
 
 WiFiComponent::WiFiComponent() : initialized_(false) {
-    Serial.println("WiFi component created");
+    LOG_WIFI_D("WiFi component created");
 }
 
 WiFiComponent::~WiFiComponent() {
-    Serial.println("WiFi component destroyed");
+    LOG_WIFI_D("WiFi component destroyed");
 }
 
 bool WiFiComponent::init() {
     if (initialized_) {
-        Serial.println("WiFi component already initialized");
+        LOG_WIFI_W("WiFi component already initialized");
         return true;
     }
     
-    Serial.println("Initializing WiFi component...");
+    LOG_WIFI_I("Initializing WiFi component...");
     
     // Generate unique hostname
     device_hostname_ = generateUniqueHostname();
     WiFi.setHostname(device_hostname_.c_str());
-    Serial.printf("Device hostname set to: %s\n", device_hostname_.c_str());
+    LOG_WIFI_I("Device hostname set to: %s", device_hostname_.c_str());
     
     // Setup WiFiManager
     setupWiFiManager();
     
     initialized_ = true;
-    Serial.println("WiFi component initialized successfully");
+    LOG_WIFI_I("WiFi component initialized successfully");
     return true;
 }
 
 bool WiFiComponent::connect() {
     if (!initialized_) {
-        Serial.println("ERROR: WiFi component not initialized");
+        LOG_WIFI_E("WiFi component not initialized");
         return false;
     }
     
-    Serial.println("Attempting WiFi connection...");
+    LOG_WIFI_I("Attempting WiFi connection...");
     
     // Try to connect, will create AP if no saved credentials
     if (!wifi_manager_.autoConnect(DEFAULT_CAPTIVE_SSID)) {
-        Serial.println("Failed to connect to WiFi");
+        LOG_WIFI_E("Failed to connect to WiFi");
         return false;
     }
     
-    Serial.println("WiFi connected successfully");
-    Serial.printf("IP address: %s\n", WiFi.localIP().toString().c_str());
+    LOG_WIFI_I("WiFi connected successfully");
+    LOG_WIFI_I("IP address: %s", WiFi.localIP().toString().c_str());
     return true;
 }
 
@@ -62,14 +63,14 @@ String WiFiComponent::getMACAddress() const {
 }
 
 void WiFiComponent::resetSettings() {
-    Serial.println("Resetting WiFi settings...");
+    LOG_WIFI_I("Resetting WiFi settings...");
     wifi_manager_.resetSettings();
-    Serial.println("WiFi settings reset completed");
+    LOG_WIFI_I("WiFi settings reset completed");
 }
 
 bool WiFiComponent::autoConnect(const char* ap_name) {
     if (!initialized_) {
-        Serial.println("ERROR: WiFi component not initialized");
+        LOG_WIFI_E("WiFi component not initialized");
         return false;
     }
     
@@ -97,13 +98,13 @@ String WiFiComponent::generateUniqueHostname() const {
 void WiFiComponent::setHostname(const String& hostname) {
     device_hostname_ = hostname;
     WiFi.setHostname(hostname.c_str());
-    Serial.printf("Hostname updated to: %s\n", hostname.c_str());
+    LOG_WIFI_I("Hostname updated to: %s", hostname.c_str());
 }
 
 void WiFiComponent::onAPModeStarted(WiFiManager* wifiManager) {
-    Serial.println("WiFi AP Mode started");
-    Serial.printf("AP Name: %s\n", DEFAULT_CAPTIVE_SSID);
-    Serial.println("Connect to configure WiFi settings");
+    LOG_WIFI_I("WiFi AP Mode started");
+    LOG_WIFI_I("AP Name: %s", DEFAULT_CAPTIVE_SSID);
+    LOG_WIFI_I("Connect to configure WiFi settings");
     
     // Note: In the original code, this triggered a UI update
     // That functionality should be handled by the main application
@@ -116,7 +117,7 @@ void WiFiComponent::setupWiFiManager() {
     
     // Additional WiFiManager configuration can be added here
     // Such as timeout settings, custom parameters, etc.
-    Serial.println("WiFiManager configured");
+    LOG_WIFI_D("WiFiManager configured");
 }
 
 uint32_t WiFiComponent::calculateMACHash() const {

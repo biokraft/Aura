@@ -145,16 +145,17 @@ flash: check/arduino-cli check/device compile
 	@echo "💡 Device will automatically reset and start running."
 .PHONY: flash
 
-## monitor: Monitor serial output from the ESP32 device.
+## monitor: Monitor serial output from the ESP32 device (resets device to show all logs from startup).
 monitor: check/arduino-cli check/device
-	@echo "📺 Starting serial monitor (Ctrl+C to exit)..."
+	@echo "📺 Starting serial monitor with device reset (Ctrl+C to exit)..."
 	@PORT=$$($(ARDUINO_CLI) board list | grep -E "(ttyUSB|ttyACM|COM|cu\.usbserial)" | head -1 | awk '{print $$1}'); \
 	if [ -z "$$PORT" ]; then \
 		echo "❌ No ESP32 device found. Please connect your device and try again."; \
 		exit 1; \
 	fi; \
 	echo "🔌 Monitoring port: $$PORT at $(BAUD_RATE) baud"; \
-	$(ARDUINO_CLI) monitor --port $$PORT --config baudrate=$(BAUD_RATE)
+	echo "🔄 Resetting device to show logs from startup..."; \
+	$(ARDUINO_CLI) monitor --port $$PORT --config baudrate=$(BAUD_RATE),dtr=on,rts=on
 .PHONY: monitor
 
 ## configure: Copy configuration files to Arduino libraries.

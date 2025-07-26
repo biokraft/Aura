@@ -1,8 +1,18 @@
 #include "logging.h"
 #include <string.h>
+#include <stdio.h>
 
 // Static variables for runtime log level management
 static bool logging_initialized = false;
+static bool time_initialized = false;
+static char current_timezone[32] = "UTC";
+
+// Default NTP servers
+static const char* default_ntp_servers[] = {
+    "pool.ntp.org",
+    "time.nist.gov",
+    "time.google.com"
+};
 
 void logging_init(void) {
     if (logging_initialized) {
@@ -20,12 +30,16 @@ void logging_init(void) {
     esp_log_level_set(TAG_WIFI, ESP_LOG_INFO);
     esp_log_level_set(TAG_CONFIG, ESP_LOG_INFO);
     
+    // Initialize time system
+    logging_init_time();
+    
     logging_initialized = true;
     
     // Log initialization complete
-    ESP_LOGI(TAG_MAIN, "Logging system initialized");
-    ESP_LOGI(TAG_MAIN, "Default log level: INFO");
-    ESP_LOGI(TAG_MAIN, "Available log levels: ERROR, WARN, INFO, DEBUG, VERBOSE");
+    LOG_MAIN_I("Logging system initialized with timestamp support");
+    LOG_MAIN_I("Default log level: INFO");
+    LOG_MAIN_I("Available log levels: ERROR, WARN, INFO, DEBUG, VERBOSE");
+    LOG_MAIN_I("Timestamp format: %s", AURA_LOG_TIMESTAMP_FORMAT_DATE_TIME ? "Date and Time" : "Time Only");
 }
 
 void logging_set_level(esp_log_level_t level) {
@@ -75,8 +89,8 @@ void logging_handle_serial_command(const char* command) {
         } else if (strcmp(level_str, "verbose") == 0) {
             logging_set_level(ESP_LOG_VERBOSE);
         } else {
-            ESP_LOGW(TAG_MAIN, "Invalid log level: %s", level_str);
-            ESP_LOGI(TAG_MAIN, "Available levels: error, warn, info, debug, verbose");
+            LOG_MAIN_W("Invalid log level: %s", level_str);
+            LOG_MAIN_I("Available levels: error, warn, info, debug, verbose");
         }
     }
     // Handle component-specific log level commands
@@ -96,48 +110,179 @@ void logging_handle_serial_command(const char* command) {
             else if (strcmp(level_str, "debug") == 0) level = ESP_LOG_DEBUG;
             else if (strcmp(level_str, "verbose") == 0) level = ESP_LOG_VERBOSE;
             else {
-                ESP_LOGW(TAG_MAIN, "Invalid level %s for component %s", level_str, component);
+                LOG_MAIN_W("Invalid level %s for component %s", level_str, component);
                 return;
             }
             
             logging_set_component_level(component, level);
         } else {
-            ESP_LOGW(TAG_MAIN, "Invalid component command format");
-            ESP_LOGI(TAG_MAIN, "Usage: log_component <COMPONENT> <level>");
-            ESP_LOGI(TAG_MAIN, "Example: log_component DISPLAY debug");
+            LOG_MAIN_W("Invalid component command format");
+            LOG_MAIN_I("Usage: log_component <COMPONENT> <level>");
+            LOG_MAIN_I("Example: log_component DISPLAY debug");
         }
     }
     // Handle status command
     else if (strcmp(command, "log_status") == 0) {
         logging_print_status();
     }
+    // Handle timezone command
+    else if (strncmp(command, "log_timezone ", 13) == 0) {
+        const char* timezone = command + 13;
+        if (strlen(timezone) > 0) {
+            logging_set_timezone(timezone);
+        } else {
+            LOG_MAIN_W("Invalid timezone command format");
+            LOG_MAIN_I("Usage: log_timezone <timezone>");
+            LOG_MAIN_I("Example: log_timezone EST5EDT");
+        }
+    }
+    // Handle SNTP server command
+    else if (strncmp(command, "log_sntp ", 9) == 0) {
+        const char* server = command + 9;
+        if (strlen(server) > 0) {
+            logging_enable_sntp(server);
+        } else {
+            LOG_MAIN_W("Invalid SNTP command format");
+            LOG_MAIN_I("Usage: log_sntp <server>");
+            LOG_MAIN_I("Example: log_sntp pool.ntp.org");
+        }
+    }
     // Handle help command
     else if (strcmp(command, "log_help") == 0 || strcmp(command, "help") == 0) {
-        ESP_LOGI(TAG_MAIN, "=== Logging Commands ===");
-        ESP_LOGI(TAG_MAIN, "log_level <level>         - Set global log level");
-        ESP_LOGI(TAG_MAIN, "log_component <tag> <level> - Set component log level");
-        ESP_LOGI(TAG_MAIN, "log_status                - Show current log configuration");
-        ESP_LOGI(TAG_MAIN, "log_help                  - Show this help");
-        ESP_LOGI(TAG_MAIN, "");
-        ESP_LOGI(TAG_MAIN, "Available levels: error, warn, info, debug, verbose");
-        ESP_LOGI(TAG_MAIN, "Available components: MAIN, DISPLAY, UI, WEATHER, WIFI, CONFIG");
+        LOG_MAIN_I("=== Logging Commands ===");
+        LOG_MAIN_I("log_level <level>           - Set global log level");
+        LOG_MAIN_I("log_component <tag> <level> - Set component log level");
+        LOG_MAIN_I("log_status                  - Show current log configuration");
+        LOG_MAIN_I("log_timezone <timezone>     - Set timezone (e.g., EST5EDT, UTC)");
+        LOG_MAIN_I("log_sntp <server>           - Set NTP server for time sync");
+        LOG_MAIN_I("log_help                    - Show this help");
+        LOG_MAIN_I("");
+        LOG_MAIN_I("Available levels: error, warn, info, debug, verbose");
+        LOG_MAIN_I("Available components: MAIN, DISPLAY, UI, WEATHER, WIFI, CONFIG");
+        LOG_MAIN_I("Timestamp format: %s", AURA_LOG_TIMESTAMP_ENABLED ? "ENABLED" : "DISABLED");
     }
 }
 
 void logging_print_status(void) {
-    ESP_LOGI(TAG_MAIN, "=== Logging System Status ===");
-    ESP_LOGI(TAG_MAIN, "Initialized: %s", logging_initialized ? "YES" : "NO");
-    ESP_LOGI(TAG_MAIN, "ESP-IDF Log Version: 2");
-    ESP_LOGI(TAG_MAIN, "");
-    ESP_LOGI(TAG_MAIN, "Component Tags:");
-    ESP_LOGI(TAG_MAIN, "  MAIN     - Main application");
-    ESP_LOGI(TAG_MAIN, "  DISPLAY  - Display and touch handling");
-    ESP_LOGI(TAG_MAIN, "  UI       - User interface logic");
-    ESP_LOGI(TAG_MAIN, "  WEATHER  - Weather data fetching");
-    ESP_LOGI(TAG_MAIN, "  WIFI     - WiFi connection management");
-    ESP_LOGI(TAG_MAIN, "  CONFIG   - Configuration management");
-    ESP_LOGI(TAG_MAIN, "");
-    ESP_LOGI(TAG_MAIN, "Memory Status:");
+    LOG_MAIN_I("=== Logging System Status ===");
+    LOG_MAIN_I("Initialized: %s", logging_initialized ? "YES" : "NO");
+    LOG_MAIN_I("Time Initialized: %s", time_initialized ? "YES" : "NO");
+    LOG_MAIN_I("ESP-IDF Log Version: 2");
+    LOG_MAIN_I("Timestamp Support: %s", AURA_LOG_TIMESTAMP_ENABLED ? "ENABLED" : "DISABLED");
+    LOG_MAIN_I("Current Timezone: %s", current_timezone);
+    LOG_MAIN_I("Time Set: %s", logging_is_time_set() ? "YES" : "NO");
+    LOG_MAIN_I("");
+    LOG_MAIN_I("Component Tags:");
+    LOG_MAIN_I("  MAIN     - Main application");
+    LOG_MAIN_I("  DISPLAY  - Display and touch handling");
+    LOG_MAIN_I("  UI       - User interface logic");
+    LOG_MAIN_I("  WEATHER  - Weather data fetching");
+    LOG_MAIN_I("  WIFI     - WiFi connection management");
+    LOG_MAIN_I("  CONFIG   - Configuration management");
+    LOG_MAIN_I("");
+    LOG_MAIN_I("Memory Status:");
     LOG_MEMORY_INFO(TAG_MAIN);
-    ESP_LOGI(TAG_MAIN, "=== End Status ===");
+    LOG_MAIN_I("=== End Status ===");
+}
+
+// ============================================================================
+// Timestamp Implementation
+// ============================================================================
+
+void logging_init_time(void) {
+    if (time_initialized) {
+        return;
+    }
+    
+    // Initialize SNTP
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, default_ntp_servers[0]);
+    esp_sntp_setservername(1, default_ntp_servers[1]);
+    esp_sntp_setservername(2, default_ntp_servers[2]);
+    esp_sntp_init();
+    
+    // Set default timezone to UTC
+    setenv("TZ", "UTC", 1);
+    tzset();
+    
+    time_initialized = true;
+    
+    // Note: Don't use LOG_MAIN_I here to avoid infinite recursion during initialization
+    ESP_LOGI(TAG_MAIN, "Time system initialized");
+}
+
+void logging_set_timezone(const char* timezone) {
+    if (!timezone) {
+        return;
+    }
+    
+    strncpy(current_timezone, timezone, sizeof(current_timezone) - 1);
+    current_timezone[sizeof(current_timezone) - 1] = '\0';
+    
+    setenv("TZ", timezone, 1);
+    tzset();
+    
+    LOG_MAIN_I("Timezone set to: %s", timezone);
+}
+
+void logging_get_timestamp(char* buffer, size_t buffer_size) {
+    if (!buffer || buffer_size < AURA_LOG_TIMESTAMP_BUFFER_SIZE) {
+        return;
+    }
+    
+    time_t now;
+    struct tm timeinfo;
+    
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    
+    // Check if time is set (year > 2020 indicates valid time)
+    if (timeinfo.tm_year < (2020 - 1900)) {
+        // Time not set, use system uptime instead
+        uint32_t uptime_ms = millis();
+        uint32_t seconds = uptime_ms / 1000;
+        uint32_t minutes = seconds / 60;
+        uint32_t hours = minutes / 60;
+        
+        snprintf(buffer, buffer_size, "UP:%02u:%02u:%02u", 
+                 hours % 24, minutes % 60, seconds % 60);
+        return;
+    }
+    
+    // Format timestamp based on configuration
+    #if AURA_LOG_TIMESTAMP_FORMAT_DATE_TIME
+        // Full date and time format: "2024-01-15 14:30:45"
+        strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", &timeinfo);
+    #else
+        // Time only format: "14:30:45"
+        strftime(buffer, buffer_size, "%H:%M:%S", &timeinfo);
+    #endif
+}
+
+bool logging_is_time_set(void) {
+    time_t now;
+    struct tm timeinfo;
+    
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    
+    // Consider time set if year is 2020 or later
+    return (timeinfo.tm_year >= (2020 - 1900));
+}
+
+void logging_enable_sntp(const char* ntp_server) {
+    if (!ntp_server) {
+        return;
+    }
+    
+    // Stop SNTP if running
+    esp_sntp_stop();
+    
+    // Set new server
+    esp_sntp_setservername(0, ntp_server);
+    
+    // Restart SNTP
+    esp_sntp_init();
+    
+    LOG_MAIN_I("SNTP server set to: %s", ntp_server);
 } 
