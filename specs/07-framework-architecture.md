@@ -4,16 +4,15 @@
 
 ## 1. Purpose
 
-This document specifies the architecture for transforming the single-purpose Aura weather widget into a general-purpose, remotely configurable display framework. This framework will support multiple "Display Agents" (mini-apps) that can be switched on the device.
+This document specifies the architecture for transforming the Aura application into a general-purpose, remotely configurable display framework. This framework will support multiple "Display Agents" (mini-apps) that can be switched on the device.
+
+The component-based refactoring detailed in [09-source-code-organization.md](./09-source-code-organization.md) is the foundational first phase of implementing this architecture.
 
 ## 2. Core Concepts
 
 ### 2.1. Display Agent
 
-A "Display Agent" is a self-contained module responsible for a specific function, such as displaying weather, a bus schedule, or a calendar. Each agent manages its own:
--   UI layout and rendering (using LVGL).
--   Data fetching and processing.
--   Event handling.
+A "Display Agent" is a self-contained module responsible for a specific function, such as displaying weather, a bus schedule, or a calendar. Each agent will leverage the core application components (`display`, `ui`) for rendering and will encapsulate its own data-handling logic.
 
 ### 2.2. Remote Configuration
 
@@ -69,7 +68,7 @@ The JSON file must conform to the following structure:
 
 ## 4. Firmware Architecture Refactoring
 
-The existing `weather.ino` will be refactored into a modular, agent-based architecture.
+The firmware will be refactored from a single-purpose application into a modular, agent-based architecture.
 
 1.  **Agent Manager:** A central component responsible for:
     -   Fetching and parsing the remote configuration JSON.
@@ -77,24 +76,26 @@ The existing `weather.ino` will be refactored into a modular, agent-based archit
     -   Managing the active agent and the switching lifecycle (`load`, `run`, `unload`).
     -   Handling the long-press gesture for switching.
 
-2.  **Display Agent Interface:** A standardized C++ interface or base class that all agents must implement.
+2.  **Display Agent Interface:** A standardized C++ interface or base class that all agents must implement. This interface ensures that the Agent Manager can treat all agents uniformly.
     ```cpp
     class DisplayAgent {
     public:
         virtual ~DisplayAgent() {}
-        // Called once when the agent is first activated
+        // Called once when the agent is activated.
         virtual void setup(const JsonObject& params) = 0;
-        // Called repeatedly in the main loop to handle updates
+        // Called repeatedly to handle updates.
         virtual void loop() = 0;
-        // Called when the agent is switched out
+        // Called when the agent is deactivated.
         virtual void teardown() = 0;
     };
     ```
 
-3.  **`WeatherAgent`:** The logic from the current `weather.ino` will be encapsulated into a `WeatherAgent` class that implements the `DisplayAgent` interface.
+3.  **Core Components (`display`, `ui`):** The existing `display` and `ui` components will provide services to all agents for rendering graphics and managing UI elements.
 
-4.  **Main Sketch (`aura.ino`):** The main `.ino` file will be simplified to:
-    -   Initialize hardware and Wi-Fi.
-    -   Prompt for the new "Configuration URL" setting in WiFiManager.
+4.  **`WeatherAgent`:** The logic from the `weather` component will be encapsulated into a `WeatherAgent` class that implements the `DisplayAgent` interface.
+
+5.  **Main Sketch (`aura.ino`):** The main `.ino` file will be simplified to:
+    -   Initialize hardware, core components (`display`, `ui`), and Wi-Fi.
+    -   Prompt for the "Configuration URL" setting in WiFiManager.
     -   Initialize the Agent Manager.
     -   In the main `loop()`, call the `loop()` method of the currently active agent. 

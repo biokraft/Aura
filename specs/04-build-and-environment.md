@@ -52,21 +52,32 @@ This file configures the LVGL graphics library.
 
 ## 5. Development Workflow & Tooling
 
-### 5.1. Source Code placement
+### 5.1. Source Code Structure
 
-The source code folders (`aura/`, `lvgl/`, `TFT_eSPI/`) must be placed in the user's Arduino sketch directory (e.g., `~/Documents/Arduino/`).
+The project follows a modular structure defined in the [Source Code Organization Specification](./09-source-code-organization.md). All application source code resides within the `aura/src/` directory, which is automatically compiled by the Arduino IDE. The main sketch file, `aura/aura.ino`, serves as the entry point.
 
-### 5.2. Font Asset Management
+The library folders (`lvgl/`, `TFT_eSPI/`) and the `aura/` sketch folder must be placed in the user's Arduino sketch directory (e.g., `~/Documents/Arduino/`).
 
-The application uses pre-rendered fonts compiled into `.c` files. The multilingual support requires including specific Unicode characters in these fonts.
+### 5.2. Asset Management
 
--   **Tool:** `aura/extract_unicode_chars.py`
--   **Purpose:** This Python script scans `weather.ino` to find all non-ASCII characters used in the string literals for different languages.
--   **Workflow:**
+The application's assets (fonts and images) are pre-compiled as C arrays and located in the `aura/src/assets/` directory.
+
+-   **Fonts**: `aura/src/assets/fonts/`
+-   **Images**: `aura/src/assets/images/`
+
+When assets are updated or added, they must be converted to C arrays and placed in the appropriate asset directory.
+
+### 5.3. Font Generation Workflow
+
+The application uses pre-rendered fonts to support multiple languages.
+
+-   **Tool**: `aura/extract_unicode_chars.py`
+-   **Purpose**: This Python script scans the source code for non-ASCII characters required for multilingual support.
+-   **Workflow**:
     1.  When adding or modifying text with special characters, run the script:
         ```bash
-        python3 aura/extract_unicode_chars.py aura/weather.ino
+        python3 aura/extract_unicode_chars.py aura/
         ```
     2.  The script outputs a list of unique characters.
-    3.  This list should be used as input for the [LVGL Font Converter tool](https://lvgl.io/tools/fontconverter) to generate new C files for the required fonts.
-    4.  The newly generated font files must replace the existing ones in the `aura/` directory. 
+    3.  Use this list with the [LVGL Font Converter tool](https://lvgl.io/tools/fontconverter) to generate new C font files.
+    4.  Place the newly generated font files into the `aura/src/assets/fonts/` directory, replacing the old ones. 

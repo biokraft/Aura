@@ -23,47 +23,50 @@ This document details the software architecture, dependencies, and core logic of
 | `lvgl`                | 9.2.2        | Graphics and UI                       |
 | `Preferences`         | (built-in)   | Storing user settings in NVS          |
 
-## 4. Core Application Logic (`weather.ino`)
+## 4. Component-Based Architecture
 
-### 4.1. Initialization (`setup()`)
+The application is designed around a component-based architecture, promoting modularity and separation of concerns. The core components are defined in `aura/src/components/`:
 
-1.  Initialize Serial, TFT display, and LVGL.
-2.  Initialize the XPT2046 touchscreen controller.
-3.  Load saved user preferences from Non-Volatile Storage (NVS) using the `Preferences` library:
-    -   Latitude, Longitude
-    -   Temperature unit (°C/°F)
-    -   Time format (12/24hr)
-    -   UI Language
-    -   Screen brightness
-4.  Configure and connect to Wi-Fi using `WiFiManager`. It starts a captive portal with SSID `Aura` if no credentials are stored.
-5.  Create the main user interface.
-6.  Start a timer to update the on-screen clock every second.
-7.  Perform an initial fetch and display of weather data.
+-   **`display`**: Manages the low-level interactions with the TFT screen and the LVGL graphics library.
+-   **`ui`**: Responsible for building and managing all user interface elements.
+-   **`weather`**: Handles all logic related to fetching, parsing, and managing weather data.
 
-### 4.2. Main Loop (`loop()`)
+These components are orchestrated by the main `aura.ino` sketch.
 
-1.  Handle LVGL timer and task processing.
-2.  Periodically fetch new weather data every 10 minutes (`UPDATE_INTERVAL`).
-3.  Increment the LVGL tick.
+## 5. Core Application Logic
 
-### 4.3. Weather Data Handling
+### 5.1. Initialization (`setup()` in `aura.ino`)
+
+1.  Initialize Serial and the `Preferences` library.
+2.  Call the `display` component to initialize the TFT and LVGL.
+3.  Load user preferences from NVS.
+4.  Configure and connect to Wi-Fi using `WiFiManager`. A captive portal with SSID `Aura` is launched if credentials are not stored.
+5.  Call the `ui` component to create the main user interface.
+6.  Perform an initial weather data fetch via the `weather` component.
+
+### 5.2. Main Loop (`loop()` in `aura.ino`)
+
+1.  Call the `display` component's loop handler for LVGL task processing.
+2.  Periodically trigger the `weather` component to fetch new data every 10 minutes.
+
+### 5.3. Weather Component (`weather.cpp`/`.h`)
 
 -   **Geocoding:**
     -   Uses `geocoding-api.open-meteo.com` to search for locations by name.
-    -   The `do_geocode_query()` function sends a GET request and parses the JSON response to populate a results list.
+    -   Provides a function to send a GET request and parse the JSON response.
 -   **Weather Forecast:**
     -   Uses `api.open-meteo.com` to fetch weather data.
-    -   Constructs a URL with latitude, longitude, and requested data fields (current, daily, hourly).
-    -   The `fetch_and_update_weather()` function handles the API request, parses the JSON payload, and updates all relevant UI elements.
-    -   Sets the system time using the UTC offset provided by the weather API.
+    -   Constructs the API request URL with coordinates and required data fields.
+    -   Provides a function to handle the API request, parse the JSON payload, and notify the `ui` component to update its elements.
+    -   Sets the system time using the UTC offset from the API response.
 
-### 4.4. Localization
+### 5.4. Localization
 
--   Supports multiple languages (English, Spanish, German, French) via `LocalizedStrings` structs.
--   The UI dynamically updates text based on the selected language.
--   Font selection is managed to support different character sets if needed (though currently uses a common Latin font).
+-   Supports multiple languages (English, Spanish, German, French) via string data structures.
+-   The `ui` component is responsible for dynamically updating on-screen text based on the selected language.
+-   The `display` component manages font loading to support different character sets.
 
-## 5. Configuration and Preferences
+## 6. Configuration and Preferences
 
 -   User settings are stored in NVS using the `Preferences` library under the "weather" namespace.
 -   Settings include:
