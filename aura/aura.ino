@@ -37,8 +37,8 @@ void setup() {
     delay(2000); // Allow serial to stabilize
     
     // Initialize logging system first
-    LOG_MAIN_I("=== AURA WEATHER DISPLAY STARTING ===");
     logging_init();
+    LOG_MAIN_I("=== AURA WEATHER DISPLAY STARTING ===");
     LOG_MAIN_I("Logging system initialized");
     LOG_MEMORY_INFO(TAG_MAIN);
     
