@@ -6,7 +6,7 @@ alwaysApply: true
 When testing the Aura project, always run the following command flash and monitor:
 
 ```bash
-make flash && timeout 30s make monitor
+make flash && timeout 15s make monitor
 ```
 
 This will ensure that the device is reset and the logs are visible from the start.
