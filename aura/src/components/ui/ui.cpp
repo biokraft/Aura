@@ -656,20 +656,53 @@ String UI::formatTemperature(float temp) {
 
 // Static event handlers
 void UI::settingsEventHandler(lv_event_t* e) {
-    if (instance) {
-        // Handle settings events
+    if (!instance) {
+        LOG_UI_E("UI instance not available for settings event");
+        return;
+    }
+    
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        LOG_UI_I("Settings interaction detected");
+        
+        // For now, just close settings window on any click
+        if (instance->settings_win) {
+            lv_obj_del(instance->settings_win);
+            instance->settings_win = nullptr;
+            LOG_UI_I("Settings window closed");
+        }
     }
 }
 
 void UI::screenEventHandler(lv_event_t* e) {
-    if (instance) {
-        // Handle screen touch events
+    if (!instance) {
+        LOG_UI_E("UI instance not available for screen event");
+        return;
+    }
+    
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        LOG_UI_I("Screen clicked - opening settings");
+        instance->createSettingsWindow();
     }
 }
 
 void UI::locationEventHandler(lv_event_t* e) {
-    if (instance) {
-        // Handle location window events
+    if (!instance) {
+        LOG_UI_E("UI instance not available for location event");
+        return;
+    }
+    
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        LOG_UI_I("Location interaction detected");
+        
+        // For now, just close location window on any click
+        if (instance->location_win) {
+            lv_obj_del(instance->location_win);
+            instance->location_win = nullptr;
+            LOG_UI_I("Location window closed");
+        }
     }
 }
 
@@ -870,4 +903,4 @@ const lv_image_dsc_t* UI::chooseIcon(int wmo_code, int is_day) const {
         default:
             return is_day ? &icon_mostly_cloudy_day : &icon_mostly_cloudy_night;
     }
-} 
+}

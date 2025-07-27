@@ -144,6 +144,9 @@ void Display::touchRead(lv_indev_data_t *data) {
         data->state = LV_INDEV_STATE_PR;
         data->point.x = x;
         data->point.y = y;
+        
+        // DEBUG: Log every touch detection
+        LOG_DISPLAY_I("TOUCH DETECTED: Raw(%d,%d) -> Screen(%d,%d)", p.x, p.y, x, y);
     } else {
         data->state = LV_INDEV_STATE_REL;
         data->point.x = 0;

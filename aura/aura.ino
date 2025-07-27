@@ -1,23 +1,17 @@
-// Aura Weather Display - Main Application
-// Complete implementation with all components
+// Aura Weather Display - DEBUG: Testing Display + UI Components
+// Adding UI component to test touch screen functionality
 
 #include "src/config.h"
 #include "src/components/logging/logging.h"
 #include "src/components/display/display.h"
 #include "src/components/ui/ui.h"
-#include "src/components/wifi/wifi.h"
-#include "src/components/weather/weather.h"
 
 #include <lvgl.h>
 #include <WiFi.h>
-#include <ArduinoJson.h>
-#include <Preferences.h>
 
 // Global component instances
 Display display;
 UI ui;
-WiFiComponent wifi_component;
-Weather weather;
 
 // Global variables (required by config.h extern declarations)
 Language current_language = LANG_EN;
@@ -27,145 +21,99 @@ char latitude[16] = LATITUDE_DEFAULT;
 char longitude[16] = LONGITUDE_DEFAULT;
 String location = LOCATION_DEFAULT;
 
-// Timing variables
-unsigned long lastWeatherUpdate = 0;
-unsigned long lastClockUpdate = 0;
-unsigned long lastLVGLTick = 0;
-
 void setup() {
     Serial.begin(115200);
-    delay(2000); // Allow serial to stabilize
+    delay(3000); // Longer delay for serial stability
     
-    // Initialize logging system first
+    Serial.println("\n=== DEBUG: Testing Display + UI Components ===");
+    Serial.flush();
+    delay(100);
+    
+    // Test 1: Basic logging
+    Serial.println("DEBUG: Step 1 - Initializing logging...");
+    Serial.flush();
     logging_init();
-    LOG_MAIN_I("=== AURA WEATHER DISPLAY STARTING ===");
-    LOG_MAIN_I("Logging system initialized");
+    LOG_MAIN_I("DEBUG: Logging system working!");
     LOG_MEMORY_INFO(TAG_MAIN);
     
-    // Initialize display system
-    LOG_MAIN_I("Initializing display...");
+    Serial.println("DEBUG: Step 2 - Initializing display...");
+    Serial.flush();
+    
+    // Test 2: Display initialization
     if (!display.init()) {
-        LOG_MAIN_E("Display initialization failed");
-        while(1) delay(1000); // Halt on critical failure
+        LOG_MAIN_E("DEBUG: Display initialization failed!");
+        Serial.println("DEBUG: DISPLAY INIT FAILED - Halting");
+        while(1) delay(1000);
+    } else {
+        LOG_MAIN_I("DEBUG: Display initialized successfully!");
+        Serial.println("DEBUG: Display init SUCCESS");
+        Serial.flush();
     }
-    LOG_MAIN_I("Display initialized successfully");
+    
     LOG_MEMORY_INFO(TAG_MAIN);
     
-    // Initialize UI system
-    LOG_MAIN_I("Initializing UI...");
+    Serial.println("DEBUG: Step 3 - Initializing UI...");
+    Serial.flush();
+    
+    // Test 3: UI initialization
     if (!ui.init(&display)) {
-        LOG_MAIN_E("UI initialization failed");
-        while(1) delay(1000); // Halt on critical failure
-    }
-    LOG_MAIN_I("UI initialized successfully");
-    
-    // Create splash screen first
-    LOG_MAIN_I("Creating splash screen...");
-    ui.createSimpleSplashScreen();
-    lv_timer_handler(); // Process LVGL tasks
-    delay(2000); // Show splash screen
-    
-    // Initialize WiFi component
-    LOG_MAIN_I("Initializing WiFi...");
-    if (!wifi_component.init()) {
-        LOG_MAIN_E("WiFi initialization failed");
+        LOG_MAIN_E("DEBUG: UI initialization failed!");
+        Serial.println("DEBUG: UI INIT FAILED - Halting");
+        while(1) delay(1000);
     } else {
-        LOG_MAIN_I("WiFi initialized successfully");
-        
-        // Try to connect to WiFi
-        LOG_MAIN_I("Attempting WiFi connection...");
-        if (wifi_component.connect()) {
-            LOG_MAIN_I("WiFi connected successfully");
-            LOG_MAIN_I("IP address: %s", wifi_component.getLocalIP().c_str());
-            
-            // Enable SNTP now that WiFi is connected
-            logging_enable_sntp("pool.ntp.org");
-        } else {
-            LOG_MAIN_W("WiFi connection failed - continuing without network");
-        }
+        LOG_MAIN_I("DEBUG: UI initialized successfully!");
+        Serial.println("DEBUG: UI init SUCCESS");
+        Serial.flush();
     }
+    
     LOG_MEMORY_INFO(TAG_MAIN);
     
-    // Initialize weather component
-    LOG_MAIN_I("Initializing weather...");
-    if (!weather.init()) {
-        LOG_MAIN_E("Weather initialization failed");
-    } else {
-        LOG_MAIN_I("Weather initialized successfully");
-        
-        // Fetch initial weather data if WiFi is connected
-        if (wifi_component.isConnected()) {
-            LOG_MAIN_I("Fetching initial weather data...");
-            weather.fetchWeatherData();
-        }
-    }
-    LOG_MEMORY_INFO(TAG_MAIN);
+    Serial.println("DEBUG: Step 4 - Creating main screen with touch handlers...");
+    Serial.flush();
     
-    // Create main application screen
-    LOG_MAIN_I("Creating main application screen...");
+    // Test 4: Create main screen with touch event handlers
     ui.createMainScreen();
+    LOG_MAIN_I("DEBUG: Main screen created with touch handlers!");
+    Serial.println("DEBUG: TOUCH SCREEN SHOULD WORK NOW - Try touching!");
+    Serial.flush();
     
-    // Update UI with any available data
-    if (weather.isDataValid()) {
-        LOG_MAIN_I("Updating UI with weather data");
-        // Convert weather data to JSON for UI update
-        JsonDocument weatherDoc;
-        const WeatherData& data = weather.getCurrentWeather();
-        weatherDoc["current"]["temperature_2m"] = data.current_temp;
-        weatherDoc["current"]["apparent_temperature"] = data.feels_like;
-        weatherDoc["current"]["weather_code"] = data.weather_code;
-        weatherDoc["current"]["is_day"] = data.is_day;
-        ui.updateWeatherData(weatherDoc);
-    }
-    
-    LOG_MAIN_I("=== AURA INITIALIZATION COMPLETE ===");
     LOG_MEMORY_INFO(TAG_MAIN);
     
-    // Initialize timing
-    lastWeatherUpdate = millis();
-    lastClockUpdate = millis();
-    lastLVGLTick = millis();
+    Serial.println("DEBUG: Step 5 - Starting heartbeat test (TOUCH THE SCREEN!)");
+    Serial.flush();
 }
 
+unsigned long lastHeartbeat = 0;
+unsigned long lastLVGLTick = 0;
+int heartbeatCount = 0;
+
 void loop() {
-    unsigned long currentTime = millis();
+    unsigned long now = millis();
     
-    // Handle LVGL timer tasks (required for UI updates)
-    if (currentTime - lastLVGLTick >= 5) {
-        lv_tick_inc(currentTime - lastLVGLTick);
-        lastLVGLTick = currentTime;
+    // Handle LVGL timer tasks (required for touch processing)
+    if (now - lastLVGLTick >= 5) {
+        lv_tick_inc(now - lastLVGLTick);
+        lastLVGLTick = now;
     }
     lv_timer_handler();
     
-    // Update clock every minute
-    if (currentTime - lastClockUpdate >= 60000) {
-        ui.updateClock();
-        lastClockUpdate = currentTime;
-    }
-    
-    // Update weather data every 10 minutes if connected
-    if (wifi_component.isConnected() && 
-        (currentTime - lastWeatherUpdate >= UPDATE_INTERVAL)) {
+    // Simple heartbeat every 3 seconds (longer to make touch testing easier)
+    if (now - lastHeartbeat > 3000) {
+        heartbeatCount++;
+        Serial.printf("DEBUG: Heartbeat %d - TOUCH SCREEN TO TEST!\n", heartbeatCount);
+        Serial.flush();
         
-        LOG_MAIN_I("Updating weather data...");
-        if (weather.fetchWeatherData()) {
-            LOG_MAIN_I("Weather data updated successfully");
-            
-            // Update UI with new weather data
-            JsonDocument weatherDoc;
-            const WeatherData& data = weather.getCurrentWeather();
-            weatherDoc["current"]["temperature_2m"] = data.current_temp;
-            weatherDoc["current"]["apparent_temperature"] = data.feels_like;
-            weatherDoc["current"]["weather_code"] = data.weather_code;
-            weatherDoc["current"]["is_day"] = data.is_day;
-            ui.updateWeatherData(weatherDoc);
-            
-            lastWeatherUpdate = currentTime;
-        } else {
-            LOG_MAIN_W("Weather update failed");
+        LOG_MAIN_I("DEBUG: Heartbeat %d - Touch screen ready", heartbeatCount);
+        LOG_MEMORY_INFO(TAG_MAIN);
+        
+        lastHeartbeat = now;
+        
+        // Remind user to test touch
+        if (heartbeatCount % 5 == 0) {
+            Serial.println("DEBUG: === TOUCH THE SCREEN TO TEST EVENT HANDLERS ===");
+            Serial.flush();
         }
     }
     
-    // Small delay to prevent watchdog issues
-    delay(10);
+    delay(5); // Very small delay for responsive touch
 }
